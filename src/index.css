@@ -19,10 +19,10 @@
   --text-muted: #71717a;
   /* Zinc 500 */
 
-  --accent-primary: #a1a1aa;
-  /* Zinc 400 - Subtle Metallic */
-  --accent-secondary: #52525b;
-  /* Zinc 600 */
+  --accent-primary: #4f46e5;
+  /* Indigo 600 */
+  --accent-secondary: #818cf8;
+  /* Indigo 400 */
 
   --success: #10b981;
   --warning: #f59e0b;
@@ -55,8 +55,10 @@
   --text-primary: #fafafa;
   --text-secondary: #d4d4d8;
   --text-muted: #71717a;
-  --accent-primary: #a1a1aa;
-  --accent-secondary: #52525b;
+  --accent-primary: #4f46e5;
+  /* Indigo 600 */
+  --accent-secondary: #818cf8;
+  /* Indigo 400 */
   --border: #27272a;
   --sidebar-bg: #18181b;
   --bg-calendar: #27272a;
