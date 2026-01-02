@@ -4,8 +4,8 @@
 export const msalConfig = {
     auth: {
         clientId: import.meta.env.VITE_CLIENT_ID || "",
-        authority: import.meta.env.VITE_AUTHORITY || "https://login.microsoftonline.com/common",
-        redirectUri: window.location.origin,
+        authority: import.meta.env.VITE_AUTHORITY || "https://login.microsoftonline.com/common"
+        //redirectUri: window.location.origin + window.location.pathname,
     },
     cache: {
         cacheLocation: "sessionStorage",
