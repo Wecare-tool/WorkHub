@@ -73,7 +73,11 @@ interface PhieuDangKy {
     crdfd_sogio2?: number;
     crdfd_diengiai?: string;
     crdfd_captrenduyet?: number; // OptionSet: ApprovalStatus
-    crdfd_hinhthuc?: number;     // OptionSet: HinhThucRegistration
+    crdfd_hinhthuc?: string;     // Text
+    crdfd_quanlytructiep?: string; // Text
+    cr1bb_songay?: number;       // Number
+    cr1bb_sopheptonnamtruoc?: number; // Number
+    new_sophepconlaitoithangthucte?: number; // Number
     statecode: number;
 }
 
@@ -203,7 +207,7 @@ async function fetchPhieuDangKy(
     // Assuming crdfd_tungay and crdfd_enngay are DateOnly or DateTime.
 
     const filter = `_crdfd_nhanvien_value eq ${employeeId} and statecode eq 0 and crdfd_tungay le ${endStr} and crdfd_enngay ge ${startStr}`;
-    const select = "crdfd_phieuangkyid,_crdfd_nhanvien_value,crdfd_loaiangky,crdfd_tungay,crdfd_enngay,crdfd_sogio2,crdfd_diengiai,crdfd_captrenduyet";
+    const select = "crdfd_phieuangkyid,_crdfd_nhanvien_value,crdfd_loaiangky,crdfd_tungay,crdfd_enngay,crdfd_sogio2,crdfd_diengiai,crdfd_captrenduyet,crdfd_hinhthuc,crdfd_quanlytructiep,cr1bb_songay,cr1bb_sopheptonnamtruoc,new_sophepconlaitoithangthucte";
 
     const url = `${dataverseConfig.baseUrl}/crdfd_phieuangkies?$filter=${encodeURIComponent(filter)}&$select=${select}`;
 
@@ -482,21 +486,28 @@ function transformToRecords(dataverseData: DataverseChamCong[]): DayRecord[] {
 
         // Xác định status
         let status: DayRecord['status'] = 'normal';
-        if (item.crdfd_trangthai) {
-            const trangthai = item.crdfd_trangthai.toLowerCase();
-            if (trangthai.includes('phép') || trangthai.includes('phep') || trangthai.includes('leave')) {
-                status = 'leave';
-            } else if (trangthai.includes('trễ') || trangthai.includes('tre') || trangthai.includes('late')) {
-                status = 'late';
-            } else if (trangthai.includes('nghỉ') || trangthai.includes('nghi') || trangthai.includes('off')) {
-                status = 'off';
-            }
+        const trangthai = (item.crdfd_trangthai || "").toLowerCase();
+        const ghichu = (item.crdfd_ghichu || "").toLowerCase();
+
+        const isHoliday = trangthai.includes('lễ') || trangthai.includes('holiday') ||
+            ghichu.includes('lễ') || ghichu.includes('holiday') ||
+            ghichu.includes('cty nghỉ') || ghichu.includes('công ty nghỉ') ||
+            ghichu.includes('tết') || trangthai.includes('tết');
+
+        if (trangthai.includes('phép') || trangthai.includes('phep') || trangthai.includes('leave')) {
+            status = 'leave';
+        } else if (trangthai.includes('trễ') || trangthai.includes('tre') || trangthai.includes('late')) {
+            status = 'late';
+        } else if (trangthai.includes('nghỉ') || trangthai.includes('nghi') || trangthai.includes('off')) {
+            status = 'off';
+        } else if (isHoliday) {
+            status = 'holiday';
         }
 
         // === WARNING DETECTION ===
-        // Skip weekends (Sunday = 0) and days with leave/off status
+        // Skip weekends (Sunday = 0), holidays, and days with leave/off status
         const isWorkday = dayOfWeek !== 0; // Monday-Saturday
-        const hasLeaveStatus = status === 'leave' || status === 'off';
+        const hasLeaveStatus = status === 'leave' || status === 'off' || status === 'holiday';
 
         if (isWorkday && !hasLeaveStatus && status === 'normal') {
             const checkIn = item.crdfd_checkin;
@@ -606,7 +617,7 @@ export async function fetchTeamRegistrations(
         filter = `(crdfd_captrenduyet eq ${ApprovalStatus.ChuaDuyet}) or (crdfd_tungay ge ${startStr} and crdfd_tungay lt ${startStrNext})`;
     }
 
-    const select = "crdfd_phieuangkyid,_crdfd_nhanvien_value,crdfd_loaiangky,crdfd_tungay,crdfd_enngay,crdfd_sogio2,crdfd_diengiai,crdfd_captrenduyet";
+    const select = "crdfd_phieuangkyid,_crdfd_nhanvien_value,crdfd_loaiangky,crdfd_tungay,crdfd_enngay,crdfd_sogio2,crdfd_diengiai,crdfd_captrenduyet,crdfd_hinhthuc,crdfd_quanlytructiep,cr1bb_songay,cr1bb_sopheptonnamtruoc,new_sophepconlaitoithangthucte";
 
     // Removed expand to avoid errors with navigation properties. Using OData Formatted Value.
     const url = `${dataverseConfig.baseUrl}/crdfd_phieuangkies?$filter=${encodeURIComponent(filter)}&$select=${select}`;
@@ -751,6 +762,10 @@ export async function updatePhieuDangKy(
         endDate?: string;
         hours?: number;
         reason?: string;
+        quanLyTructiep?: string;
+        capTrenDuyet?: number;
+        hinhThuc?: string;
+        soNgay?: number;
     }
 ): Promise<boolean> {
     const url = `${dataverseConfig.baseUrl}/crdfd_phieuangkies(${registrationId})`;
@@ -761,6 +776,10 @@ export async function updatePhieuDangKy(
     if (data.endDate !== undefined) payload.crdfd_enngay = data.endDate;
     if (data.hours !== undefined) payload.crdfd_sogio2 = data.hours;
     if (data.reason !== undefined) payload.crdfd_diengiai = data.reason;
+    if (data.quanLyTructiep !== undefined) payload.crdfd_quanlytructiep = data.quanLyTructiep;
+    if (data.capTrenDuyet !== undefined) payload.crdfd_captrenduyet = data.capTrenDuyet;
+    if (data.hinhThuc !== undefined) payload.crdfd_hinhthuc = data.hinhThuc;
+    if (data.soNgay !== undefined) payload.cr1bb_songay = data.soNgay;
 
     try {
         const response = await fetch(url, {

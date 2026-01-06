@@ -66,6 +66,8 @@ export const Calendar: React.FC<CalendarProps> = ({
         } else if (record) {
             if (record.status === 'leave') {
                 classes.push('leave');
+            } else if (record.status === 'holiday') {
+                classes.push('holiday');
             } else if (record.status === 'late') {
                 classes.push('late');
             } else if (record.status === 'warning') {
@@ -144,6 +146,9 @@ export const Calendar: React.FC<CalendarProps> = ({
                                         {record && record.status === 'late' && (
                                             <span className="status-badge late">Trễ</span>
                                         )}
+                                        {record && record.status === 'holiday' && (
+                                            <span className="status-badge holiday">Lễ</span>
+                                        )}
                                         {record && record.status === 'warning' && (
                                             <span className="status-badge warning" title="Thiếu check-in/out hoặc giờ bất thường">⚠️</span>
                                         )}
@@ -182,6 +187,10 @@ export const Calendar: React.FC<CalendarProps> = ({
                 <div className="legend-item">
                     <span className="legend-color off-day"></span>
                     <span>Nghỉ</span>
+                </div>
+                <div className="legend-item">
+                    <span className="legend-color holiday"></span>
+                    <span>Ngày lễ</span>
                 </div>
             </div>
         </div>
