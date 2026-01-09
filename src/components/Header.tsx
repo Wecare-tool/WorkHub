@@ -1,5 +1,4 @@
 import React from 'react';
-import { AccountInfo } from '@azure/msal-browser';
 
 interface HeaderProps {
     year: number;

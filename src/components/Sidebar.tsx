@@ -19,8 +19,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     onChangeView,
     user,
     isAuthenticated,
-    onLogin,
-    onLogout
+    onLogin
 }) => {
     const [managementOpen, setManagementOpen] = useState(true);
     const [warehouseOpen, setWarehouseOpen] = useState(true);
