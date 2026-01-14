@@ -91,8 +91,8 @@ export const ProductsList: React.FC = () => {
                 currentPage,
                 pageSize,
                 searchQuery || undefined,
-                selectedLocation || undefined,
-                onlyNegativeStock
+                selectedLocation ? [selectedLocation] : undefined,
+                onlyNegativeStock ? 'negative' : 'all'
             );
 
             setData(response.data);

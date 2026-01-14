@@ -75,7 +75,7 @@ export const InventoryHistoryModal: React.FC<InventoryHistoryModalProps> = ({ pr
                         </div>
                     ) : history.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-12 text-[var(--text-muted)] opacity-50">
-                            <HistoryOutlined style={{ fontSize: 48 }} strokeWidth={1} />
+                            <HistoryOutlined style={{ fontSize: 48 }} />
                             <p className="mt-2">Không có dữ liệu lịch sử</p>
                         </div>
                     ) : (
