@@ -1150,6 +1150,357 @@ export interface TransactionBuyPaginatedResponse {
     hasPreviousPage: boolean;
 }
 
+// ==========================================
+// INVENTORY CHECK SERVICES (Kiểm tra tồn kho)
+// ==========================================
+
+export interface InventoryCheckItem {
+    crdfd_kho_binh_dinhid: string;
+    productName: string;           // lookup formatted value
+    productCode: string;           // crdfd_masp
+    warehouseLocation: string;     // lookup formatted value
+    tonKhoThucTe: number;          // crdfd_tonkhothucte
+    tonKhoLyThuyet: number;        // crdfd_tonkholythuyet
+    tonKhaDung: number;            // cr1bb_tonkhadung
+    hangLoiSauKiem: number;        // cr1bb_slhangloisaukiem
+    tongTonKho: number;            // calculated: tonKhoThucTe + hangLoiSauKiem
+}
+
+export interface InventoryCheckPaginatedResponse {
+    data: InventoryCheckItem[];
+    totalCount: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+}
+
+export interface WarehouseLocationOption {
+    id: string;
+    name: string;
+}
+
+/**
+ * Fetch warehouse locations for filter dropdown
+ * NOTE: Since we don't know the exact Warehouse master table name, 
+ * we will derive the list of warehouses from the unique values in the Inventory table.
+ */
+export async function fetchWarehouseLocationsForFilter(
+    accessToken: string
+): Promise<WarehouseLocationOption[]> {
+    // Query inventory to find unique warehouse locations
+    // We select just the lookup column to minimize data
+    // Increasing top to get good coverage, though this might not get ALL warehouses if some have no stock.
+    const url = `${dataverseConfig.baseUrl}/crdfd_kho_binh_dinhs?$select=_crdfd_vitrikho_value&$top=2000&$filter=statecode eq 0`;
+
+    try {
+        const response = await fetch(url, {
+            headers: {
+                "Authorization": `Bearer ${accessToken}`,
+                "OData-MaxVersion": "4.0",
+                "OData-Version": "4.0",
+                "Accept": "application/json",
+                "Prefer": "odata.include-annotations=\"*\""
+            },
+        });
+
+        if (!response.ok) {
+            console.error("Error fetching warehouse locations from inventory:", await response.text());
+            return [];
+        }
+
+        const data = await response.json();
+        const items = data.value || [];
+
+        // Extract unique locations
+        const locationMap = new Map<string, string>();
+
+        items.forEach((item: any) => {
+            const id = item._crdfd_vitrikho_value;
+            const name = item['_crdfd_vitrikho_value@OData.Community.Display.V1.FormattedValue'];
+
+            if (id && name) {
+                locationMap.set(id, name);
+            }
+        });
+
+        return Array.from(locationMap.entries()).map(([id, name]) => ({ id, name }));
+    } catch (e) {
+        console.error("Exception fetching warehouse locations:", e);
+        return [];
+    }
+}
+
+/**
+ * Fetch Inventory Check data from crdfd_kho_binh_dinhs
+ */
+export async function fetchInventoryCheck(
+    accessToken: string,
+    _page: number = 1,
+    _pageSize: number = 50,
+    searchText?: string,
+    warehouseLocationIds?: string[],
+    stockFilter: 'all' | 'negative' | 'nonzero' = 'all'
+): Promise<InventoryCheckPaginatedResponse> {
+    // NOTE: Dataverse/Dynamics sometimes does not support $skip on certain entities or configurations.
+    // For "Skip Clause is not supported" error, we must either use paging cookies or client-side pagination.
+    // Given the requirements, we will use a larger $top and handle simple cases, 
+    // OR just fetch the first page. For proper pagination we'd need to implement NextLink.
+    // To keep it simple and robust for this context: We will fetch reasonable amount of data and let client paginate 
+    // if it fits in one batch, OR just show first N results.
+    // Let's rely on Search for finding specific items instead of deep pagination.
+
+    // We will attempt client-side pagination simulation by fetching a larger chunk if needed, 
+    // or just fetch page 1 for now (since skip is broken).
+    // Actually, to fix "Skip Clause is not supported", we REMOVE $skip.
+
+    // Select columns including lookups
+    // Verified select columns from Dataverse list
+    const select = [
+        "crdfd_kho_binh_dinhid",
+        "_crdfd_vitrikho_value",
+        "_crdfd_tensanphamlookup_value",
+        "crdfd_tensptext",
+        "crdfd_masp",
+        "crdfd_onvi",
+        "crdfd_tonkhothucte",
+        "crdfd_tonkholythuyet",
+        "cr1bb_tonkhadung",
+        "cr1bb_slhangloisaukiem",
+        "crdfd_ton_kho_theo_ke_hoach"
+    ].join(",");
+
+    // Build filter
+    let filter = "statecode eq 0";
+
+    // Filter by warehouse locations (multiple)
+    if (warehouseLocationIds && warehouseLocationIds.length > 0) {
+        const locationFilters = warehouseLocationIds.map((id: string) => `_crdfd_vitrikho_value eq ${id}`);
+        filter += ` and (${locationFilters.join(" or ")})`;
+    }
+
+    if (searchText) {
+        const escapedSearch = searchText.replace(/'/g, "''");
+        filter += ` and (contains(crdfd_masp, '${escapedSearch}') or contains(crdfd_tensptext, '${escapedSearch}'))`;
+    }
+
+    if (stockFilter === 'negative') {
+        filter += ` and crdfd_tonkhothucte lt 0`;
+    } else if (stockFilter === 'nonzero') {
+        filter += ` and crdfd_tonkhothucte ne 0`;
+    }
+
+    const query = `$filter=${encodeURIComponent(filter)}&$select=${select}&$top=2000&$count=true&$orderby=crdfd_masp asc`;
+    const url = `${dataverseConfig.baseUrl}/crdfd_kho_binh_dinhs?${query}`;
+
+    try {
+        const response = await fetch(url, {
+            headers: {
+                "Authorization": `Bearer ${accessToken}`,
+                "OData-MaxVersion": "4.0",
+                "OData-Version": "4.0",
+                "Accept": "application/json",
+                "Prefer": "odata.include-annotations=\"*\""
+            },
+        });
+
+        if (!response.ok) {
+            console.error("Error fetching inventory check:", await response.text());
+            return { data: [], totalCount: 0, hasNextPage: false, hasPreviousPage: false };
+        }
+
+        const data = await response.json();
+        const items = data.value || [];
+        const totalCount = data['@odata.count'] || items.length;
+
+        const mappedItems: InventoryCheckItem[] = items.map((item: any) => {
+            const tonKhoThucTe = item.crdfd_tonkhothucte || 0;
+            const hangLoiSauKiem = item.cr1bb_slhangloisaukiem || 0;
+
+            // Updated name mapping: prioritize lookup formatted value for the cleaner name
+            const productName = item['_crdfd_tensanphamlookup_value@OData.Community.Display.V1.FormattedValue']
+                || item.crdfd_tensptext
+                || item.crdfd_masp
+                || "Unknown";
+
+            return {
+                crdfd_kho_binh_dinhid: item.crdfd_kho_binh_dinhid,
+                productName: productName,
+                productCode: item.crdfd_masp || "",
+                warehouseLocation: item['_crdfd_vitrikho_value@OData.Community.Display.V1.FormattedValue'] || "Unknown",
+                tonKhoThucTe: tonKhoThucTe,
+                tonKhoLyThuyet: item.crdfd_tonkholythuyet || 0,
+                tonKhaDung: item.cr1bb_tonkhadung || 0,
+                hangLoiSauKiem: hangLoiSauKiem,
+                tongTonKho: tonKhoThucTe + hangLoiSauKiem
+            };
+        });
+
+        return {
+            data: mappedItems,
+            totalCount: totalCount,
+            hasNextPage: false, // Since we removed skip, we can't easily valid next page without nextLink
+            hasPreviousPage: false
+        };
+    } catch (e) {
+        console.error("Exception fetching inventory check:", e);
+        return { data: [], totalCount: 0, hasNextPage: false, hasPreviousPage: false };
+    }
+}
+
+// ==========================================
+// INVENTORY PRODUCTS SERVICES (Cho ProductsList.tsx)
+// ==========================================
+
+export interface InventoryProduct {
+    crdfd_kho_binh_dinhid: string;
+    productName: string;
+    productCode?: string;
+    crdfd_masp?: string;
+    crdfd_onvi?: string;
+    locationName?: string;
+    warehouseLocation?: string;
+    currentStock?: number;
+    crdfd_tonkhothucte?: number;
+    crdfd_tonkholythuyet?: number;
+    crdfd_ton_kho_theo_ke_hoach?: number;
+}
+
+export interface InventoryProductsPaginatedResponse {
+    data: InventoryProduct[];
+    totalCount: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+}
+
+export interface InventoryHistoryRecord {
+    id: string;
+    type: string;
+    date: string;
+    quantity: number;
+    reference: string;
+    note?: string;
+}
+
+/**
+ * Fetch warehouse locations for filter dropdown (alias for backward compatibility)
+ */
+export async function fetchWarehouseLocations(
+    accessToken: string
+): Promise<WarehouseLocationOption[]> {
+    return fetchWarehouseLocationsForFilter(accessToken);
+}
+
+/**
+ * Fetch Inventory Products (For ProductsList.tsx)
+ */
+export async function fetchInventoryProducts(
+    accessToken: string,
+    _page: number = 1,
+    _pageSize: number = 50,
+    searchText?: string,
+    warehouseLocationIds?: string[],
+    stockFilter: 'all' | 'negative' | 'nonzero' = 'all'
+): Promise<InventoryProductsPaginatedResponse> {
+    // Reuse logic from fetchInventoryCheck but mapping to different interface
+    // Also handling Skip removal
+
+    // Verified select columns from Dataverse list
+    const select = [
+        "crdfd_kho_binh_dinhid",
+        "_crdfd_vitrikho_value",
+        "_crdfd_tensanphamlookup_value",
+        "crdfd_tensptext",
+        "crdfd_masp",
+        "crdfd_onvi",
+        "crdfd_tonkhothucte",
+        "crdfd_tonkholythuyet",
+        "crdfd_ton_kho_theo_ke_hoach"
+    ].join(",");
+
+    let filter = "statecode eq 0";
+
+    // Filter by warehouse locations (multiple)
+    if (warehouseLocationIds && warehouseLocationIds.length > 0) {
+        const locationFilters = warehouseLocationIds.map((id: string) => `_crdfd_vitrikho_value eq ${id}`);
+        filter += ` and (${locationFilters.join(" or ")})`;
+    }
+
+    if (stockFilter === 'negative') {
+        filter += ` and crdfd_tonkhothucte lt 0`;
+    } else if (stockFilter === 'nonzero') {
+        filter += ` and crdfd_tonkhothucte ne 0`;
+    }
+
+    if (searchText) {
+        const escapedSearch = searchText.replace(/'/g, "''");
+        filter += ` and (contains(crdfd_masp, '${escapedSearch}') or contains(crdfd_tensptext, '${escapedSearch}'))`;
+    }
+
+    // REMOVED $skip
+    const query = `$filter=${encodeURIComponent(filter)}&$select=${select}&$top=2000&$count=true&$orderby=crdfd_masp asc`;
+    const url = `${dataverseConfig.baseUrl}/crdfd_kho_binh_dinhs?${query}`;
+
+    try {
+        const response = await fetch(url, {
+            headers: {
+                "Authorization": `Bearer ${accessToken}`,
+                "OData-MaxVersion": "4.0",
+                "OData-Version": "4.0",
+                "Accept": "application/json",
+                "Prefer": "odata.include-annotations=\"*\""
+            },
+        });
+
+        if (!response.ok) {
+            console.error("Error fetching inventory products:", await response.text());
+            return { data: [], totalCount: 0, hasNextPage: false, hasPreviousPage: false };
+        }
+
+        const data = await response.json();
+        const items = data.value || [];
+        const totalCount = data['@odata.count'] || items.length;
+
+        const mappedItems: InventoryProduct[] = items.map((item: any) => ({
+            crdfd_kho_binh_dinhid: item.crdfd_kho_binh_dinhid,
+            productName: item['_crdfd_tensanphamlookup_value@OData.Community.Display.V1.FormattedValue'] || item.crdfd_tensptext || item.crdfd_masp || "Unknown",
+            productCode: item.crdfd_masp || "",
+            crdfd_masp: item.crdfd_masp,
+            crdfd_onvi: item.crdfd_onvi,
+            locationName: item['_crdfd_vitrikho_value@OData.Community.Display.V1.FormattedValue'] || "Unknown",
+            warehouseLocation: item['_crdfd_vitrikho_value@OData.Community.Display.V1.FormattedValue'] || "Unknown",
+            currentStock: item.crdfd_tonkhothucte || 0,
+            crdfd_tonkhothucte: item.crdfd_tonkhothucte || 0,
+            crdfd_tonkholythuyet: item.crdfd_tonkholythuyet || 0,
+            crdfd_ton_kho_theo_ke_hoach: item.crdfd_ton_kho_theo_ke_hoach || 0
+        }));
+
+        return {
+            data: mappedItems,
+            totalCount: totalCount,
+            hasNextPage: false,
+            hasPreviousPage: false
+        };
+    } catch (e) {
+        console.error("Exception fetching inventory products:", e);
+        return { data: [], totalCount: 0, hasNextPage: false, hasPreviousPage: false };
+    }
+}
+
+/**
+ * Fetch Inventory History for a product
+ */
+export async function fetchInventoryHistory(
+    _accessToken: string,
+    khoId: string
+): Promise<InventoryHistoryRecord[]> {
+    // This assumes there's a related entity for history
+    // If no history table exists, return empty array
+    // For now, returning empty as placeholder
+    console.log("Fetching history for khoId:", khoId);
+
+    // TODO: Implement actual history fetch when table is known
+    return [];
+}
+
 export async function fetchTransactionBuys(
     accessToken: string,
     page: number = 1,

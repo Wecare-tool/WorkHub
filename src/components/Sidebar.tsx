@@ -1,13 +1,21 @@
 import React, { useState } from 'react';
 import { AccountInfo } from '@azure/msal-browser';
 import {
-    Settings as SettingsIcon
-} from 'lucide-react';
+    SettingOutlined,
+    ToolOutlined,
+    BarChartOutlined,
+    InteractionOutlined,
+    ContainerOutlined,
+    CalendarOutlined,
+    FormOutlined,
+    AuditOutlined,
+    LoginOutlined
+} from '@ant-design/icons';
 import { Settings } from './Settings';
 
 interface SidebarProps {
-    currentView: 'personal' | 'team' | 'audit' | 'management' | 'tools' | 'warehouse' | 'warehouse-tables' | 'warehouse-flow';
-    onChangeView: (view: 'personal' | 'team' | 'audit' | 'management' | 'tools' | 'warehouse' | 'warehouse-tables' | 'warehouse-flow') => void;
+    currentView: 'personal' | 'team' | 'audit' | 'management' | 'tools' | 'warehouse' | 'warehouse-tables' | 'warehouse-flow' | 'inventory-check';
+    onChangeView: (view: 'personal' | 'team' | 'audit' | 'management' | 'tools' | 'warehouse' | 'warehouse-tables' | 'warehouse-flow' | 'inventory-check') => void;
     user: AccountInfo | null;
     isAuthenticated: boolean;
     onLogin: () => void;
@@ -38,7 +46,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         onClick={() => setIsSettingsOpen(true)}
                         title="Cấu hình giao diện"
                     >
-                        <SettingsIcon size={18} />
+                        <SettingOutlined style={{ fontSize: 18 }} />
                     </button>
                 </div>
 
@@ -58,14 +66,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                     className={`nav-item ${currentView === 'management' ? 'active' : ''}`}
                                     onClick={() => onChangeView('management')}
                                 >
-                                    <span className="icon">⚙️</span>
+                                    <SettingOutlined className="icon" />
                                     <span className="label">Admin Page</span>
                                 </button>
                                 <button
                                     className={`nav-item ${currentView === 'tools' ? 'active' : ''}`}
                                     onClick={() => onChangeView('tools')}
                                 >
-                                    <span className="icon">🛠️</span>
+                                    <ToolOutlined className="icon" />
                                     <span className="label">Tools</span>
                                 </button>
                             </div>
@@ -88,15 +96,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                     className={`nav-item ${currentView === 'warehouse-tables' ? 'active' : ''}`}
                                     onClick={() => onChangeView('warehouse-tables')}
                                 >
-                                    <span className="icon">📊</span>
+                                    <BarChartOutlined className="icon" />
                                     <span className="label">Tables</span>
                                 </button>
                                 <button
                                     className={`nav-item ${currentView === 'warehouse-flow' ? 'active' : ''}`}
                                     onClick={() => onChangeView('warehouse-flow')}
                                 >
-                                    <span className="icon">🌊</span>
+                                    <InteractionOutlined className="icon" />
                                     <span className="label">Flow/Dataflow Monitor</span>
+                                </button>
+                                <button
+                                    className={`nav-item ${currentView === 'inventory-check' ? 'active' : ''}`}
+                                    onClick={() => onChangeView('inventory-check')}
+                                >
+                                    <ContainerOutlined className="icon" />
+                                    <span className="label">Check tồn kho</span>
                                 </button>
                             </div>
                         )}
@@ -117,7 +132,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                     className={`nav-item ${currentView === 'personal' ? 'active' : ''}`}
                                     onClick={() => onChangeView('personal')}
                                 >
-                                    <span className="icon">📅</span>
+                                    <CalendarOutlined className="icon" />
                                     <span className="label">TimeSheet</span>
                                 </button>
 
@@ -125,7 +140,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                     className={`nav-item ${currentView === 'team' ? 'active' : ''}`}
                                     onClick={() => onChangeView('team')}
                                 >
-                                    <span className="icon">📝</span>
+                                    <FormOutlined className="icon" />
                                     <span className="label">Adjustment Request</span>
                                 </button>
 
@@ -133,7 +148,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                     className={`nav-item ${currentView === 'audit' ? 'active' : ''}`}
                                     onClick={() => onChangeView('audit')}
                                 >
-                                    <span className="icon">📋</span>
+                                    <AuditOutlined className="icon" />
                                     <span className="label">Change History</span>
                                 </button>
                             </div>
@@ -146,7 +161,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         <span>@2026 HieuLe</span>
                         {(!isAuthenticated || !user) && (
                             <button className="login-btn-compact" onClick={onLogin} title="Đăng nhập">
-                                🔑
+                                <LoginOutlined />
                             </button>
                         )}
                     </div>
@@ -160,7 +175,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         <div className="settings-popup-content" onClick={e => e.stopPropagation()}>
                             <div className="settings-popup-header">
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                    <SettingsIcon size={20} className="text-accent" />
+                                    <SettingOutlined className="text-accent" style={{ fontSize: 20 }} />
                                     <h2 style={{ fontSize: '1.25rem', fontWeight: 600 }}>Cấu hình giao diện</h2>
                                 </div>
                                 <button className="close-popup-btn" onClick={() => setIsSettingsOpen(false)}>

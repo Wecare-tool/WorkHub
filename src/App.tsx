@@ -12,6 +12,7 @@ import { Tools } from './components/Tools';
 import { DayDetail } from './components/DayDetail';
 import { WorkSummary } from './components/WorkSummary';
 import { WarehouseLayout } from './components/Warehouse/WarehouseLayout';
+import { InventoryCheck } from './components/Warehouse/InventoryCheck';
 
 import { DayRecord, MonthSummary } from './types/types';
 import { calculateMonthSummary } from './utils/workUtils';
@@ -24,7 +25,7 @@ function App() {
     const { instance, accounts, inProgress } = useMsal();
     const isAuthenticated = useIsAuthenticated();
 
-    const [currentViewState, setCurrentViewState] = useState<'personal' | 'team' | 'audit' | 'management' | 'tools' | 'warehouse' | 'warehouse-tables' | 'warehouse-flow'>('personal');
+    const [currentViewState, setCurrentViewState] = useState<'personal' | 'team' | 'audit' | 'management' | 'tools' | 'warehouse' | 'warehouse-tables' | 'warehouse-flow' | 'inventory-check'>('personal');
 
     const today = new Date();
     const [year, setYear] = useState(today.getFullYear());
@@ -145,6 +146,7 @@ function App() {
             case 'warehouse-tables': return 'Warehouse Tables';
             case 'warehouse-flow': return 'Flow Monitor';
             case 'warehouse': return 'Warehouse';
+            case 'inventory-check': return 'Check tồn kho';
             default: return 'WorkHub';
         }
     };
@@ -234,6 +236,10 @@ function App() {
                     ) : currentViewState === 'tools' ? (
                         <div className="main-content">
                             <Tools />
+                        </div>
+                    ) : currentViewState === 'inventory-check' ? (
+                        <div className="main-content">
+                            <InventoryCheck />
                         </div>
                     ) : currentViewState === 'warehouse' || currentViewState === 'warehouse-tables' || currentViewState === 'warehouse-flow' ? (
                         <div className="main-content">
