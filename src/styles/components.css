@@ -1,0 +1,115 @@
+/* ===== Buttons & Utilities ===== */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1.25rem;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 1px solid transparent;
+
+    &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    &-primary {
+        background: var(--accent-primary);
+        color: white;
+
+        &:hover:not(:disabled) {
+            background: var(--accent-secondary);
+            transform: translateY(-1px);
+        }
+    }
+
+    &-approve {
+        background: rgba(16, 185, 129, 0.1);
+        color: #34d399;
+        border-color: rgba(16, 185, 129, 0.2);
+
+        &:hover:not(:disabled) {
+            background: rgba(16, 185, 129, 0.2);
+        }
+    }
+
+    &-reject {
+        background: rgba(239, 68, 68, 0.1);
+        color: #f87171;
+        border-color: rgba(239, 68, 68, 0.2);
+
+        &:hover:not(:disabled) {
+            background: rgba(239, 68, 68, 0.2);
+        }
+    }
+}
+
+/* ===== Form Elements ===== */
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+
+    label {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--text-secondary);
+    }
+
+    input,
+    select,
+    textarea {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        background: var(--bg-input);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        color: var(--text-primary);
+        outline: none;
+        transition: all 0.2s;
+
+        &:focus {
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.1);
+        }
+    }
+}
+
+/* ===== Specific Components ===== */
+.user-profile-sidebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 0.75rem;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+}
+
+.logo-text {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: var(--accent-primary);
+    letter-spacing: -0.02em;
+}
+
+/* Helper Classes */
+.m-top-10 {
+    margin-top: 10px;
+}
+
+.m-bottom-12 {
+    margin-bottom: 12px;
+}
+
+.text-center {
+    text-align: center;
+}
+
+.flex-1 {
+    flex: 1;
+}

@@ -1,0 +1,173 @@
+/* ===== CSS Variables & Reset ===== */
+:root {
+    /* Default Fallback (Zinc/Violet) */
+    --bg-primary: #09090b;
+    --bg-secondary: rgba(24, 24, 27, 0.6);
+    --bg-card: #18181b;
+    --bg-hover: #27272a;
+    --bg-header: #18181b;
+
+    --text-primary: #fafafa;
+    --text-secondary: #d4d4d8;
+    --text-muted: #71717a;
+
+    --accent-primary: #a78bfa;
+    --accent-secondary: #c4b5fd;
+
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+
+    --radius-full: 20px;
+    --glass-opacity: 0.85;
+    --glass-blur: 20px;
+    --border-opacity: 0.1;
+    --border: rgba(255, 255, 255, var(--border-opacity));
+
+    --shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    --glass: color-mix(in srgb, var(--bg-card), transparent calc(100% - var(--glass-opacity) * 100%));
+
+    /* Sidebar & Layout specific */
+    --sidebar-bg: var(--bg-card);
+    --sidebar-glass: color-mix(in srgb, var(--sidebar-bg), transparent calc(100% - var(--glass-opacity) * 100%));
+    --main-layout-bg: var(--bg-card);
+    --main-layout-glass: color-mix(in srgb, var(--main-layout-bg), transparent calc(100% - var(--glass-opacity) * 100%));
+
+    /* Calendar & Inputs */
+    --bg-calendar: var(--bg-hover);
+    --bg-cell: var(--bg-card);
+    --bg-off-day: rgba(39, 39, 42, 0.4);
+    --border-cell: rgba(255, 255, 255, var(--border-opacity));
+    --bg-input: rgba(24, 24, 27, 0.7);
+    --overlay-bg: rgba(0, 0, 0, 0.9);
+}
+
+/* Tailwind 4 @theme mapping */
+@theme {
+    --color-bg-primary: var(--bg-primary);
+    --color-bg-secondary: var(--bg-secondary);
+    --color-bg-card: var(--bg-card);
+    --color-text-primary: var(--text-primary);
+    --color-accent-primary: var(--accent-primary);
+    --color-accent-secondary: var(--accent-secondary);
+    --radius-app: var(--radius-full);
+}
+
+/* ===== Background Themes ===== */
+
+[data-bg="zinc"] {
+    --bg-primary: #09090b;
+    --bg-secondary: rgba(24, 24, 27, 0.6);
+    --bg-card: #18181b;
+    --bg-hover: #27272a;
+    --bg-header: #18181b;
+    --text-primary: #fafafa;
+    --text-secondary: #d4d4d8;
+    --text-muted: #71717a;
+    --sidebar-bg: #18181b;
+    --main-layout-bg: #18181b;
+    --bg-calendar: #27272a;
+    --bg-cell: #18181b;
+    --bg-off-day: rgba(39, 39, 42, 0.4);
+    --bg-input: rgba(24, 24, 27, 0.7);
+}
+
+[data-bg="slate"] {
+    --bg-primary: #020617;
+    --bg-secondary: rgba(15, 23, 42, 0.6);
+    --bg-card: #0f172a;
+    --bg-hover: #1e293b;
+    --bg-header: #0f172a;
+    --text-primary: #f8fafc;
+    --text-secondary: #cbd5e1;
+    --text-muted: #64748b;
+    --sidebar-bg: #0f172a;
+    --main-layout-bg: #0f172a;
+    --bg-calendar: #1e293b;
+    --bg-cell: #0f172a;
+    --bg-off-day: rgba(15, 23, 42, 0.5);
+    --bg-input: rgba(15, 23, 42, 0.7);
+}
+
+[data-bg="stone"] {
+    --bg-primary: #0c0a09;
+    --bg-secondary: rgba(28, 25, 23, 0.6);
+    --bg-card: #1c1917;
+    --bg-hover: #292524;
+    --bg-header: #1c1917;
+    --text-primary: #fafaf9;
+    --text-secondary: #d6d3d1;
+    --text-muted: #78716c;
+    --sidebar-bg: #1c1917;
+    --main-layout-bg: #1c1917;
+    --bg-calendar: #292524;
+    --bg-cell: #1c1917;
+    --bg-off-day: rgba(41, 37, 36, 0.4);
+    --bg-input: rgba(28, 25, 23, 0.7);
+}
+
+[data-bg="gray"] {
+    --bg-primary: #030712;
+    --bg-secondary: rgba(17, 24, 39, 0.6);
+    --bg-card: #111827;
+    --bg-hover: #1f2937;
+    --bg-header: #111827;
+    --text-primary: #f9fafb;
+    --text-secondary: #d1d5db;
+    --text-muted: #6b7280;
+    --sidebar-bg: #111827;
+    --main-layout-bg: #111827;
+    --bg-calendar: #1f2937;
+    --bg-cell: #111827;
+    --bg-off-day: rgba(31, 41, 55, 0.4);
+    --bg-input: rgba(17, 24, 39, 0.7);
+}
+
+[data-bg="neutral"] {
+    --bg-primary: #0a0a0a;
+    --bg-secondary: rgba(23, 23, 23, 0.6);
+    --bg-card: #171717;
+    --bg-hover: #262626;
+    --bg-header: #171717;
+    --text-primary: #fafafa;
+    --text-secondary: #d4d4d4;
+    --text-muted: #737373;
+    --sidebar-bg: #171717;
+    --main-layout-bg: #171717;
+    --bg-calendar: #262626;
+    --bg-cell: #171717;
+    --bg-off-day: rgba(38, 38, 38, 0.4);
+    --bg-input: rgba(23, 23, 23, 0.7);
+}
+
+/* ===== Accent Colors ===== */
+
+[data-accent="violet"] {
+    --accent-primary: #a78bfa;
+    --accent-secondary: #c4b5fd;
+}
+
+[data-accent="blue"] {
+    --accent-primary: #60a5fa;
+    --accent-secondary: #93c5fd;
+}
+
+[data-accent="indigo"] {
+    --accent-primary: #818cf8;
+    --accent-secondary: #a5b4fc;
+}
+
+[data-accent="emerald"] {
+    --accent-primary: #34d399;
+    --accent-secondary: #6ee7b7;
+}
+
+[data-accent="orange"] {
+    --accent-primary: #fb923c;
+    --accent-secondary: #fdba74;
+}
+
+[data-accent="rose"] {
+    --accent-primary: #fb7185;
+    --accent-secondary: #fda4af;
+}

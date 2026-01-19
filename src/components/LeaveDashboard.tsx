@@ -117,23 +117,25 @@ export const LeaveDashboard: React.FC<LeaveDashboardProps> = ({ employeeId, year
     };
 
     return (
-        <div className="leave-dashboard">
-            {/* Tab Navigation */}
-            <div className="tab-navigation">
-                <button
-                    className={`tab-btn ${activeTab === 'registration' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('registration')}
-                >
-                    📋 Phiếu đăng ký ({registrations.length})
-                </button>
-                <button
-                    className={`tab-btn ${activeTab === 'dntt' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('dntt')}
-                >
-                    💰 DNTT ({dnttRecords.length})
-                </button>
+        <div className="leave-dashboard list-view-container">
+            {/* Unified Header */}
+            <div className="list-view-header">
+                <div className="list-view-toolbar">
+                    <button
+                        className={`tab-btn ${activeTab === 'registration' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('registration')}
+                    >
+                        📋 Phiếu đăng ký ({registrations.length})
+                    </button>
+                    <button
+                        className={`tab-btn ${activeTab === 'dntt' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('dntt')}
+                    >
+                        💰 DNTT ({dnttRecords.length})
+                    </button>
+                </div>
 
-                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
+                <div className="list-view-actions">
                     {activeTab === 'registration' && (
                         <a
                             href="https://wecare-ii.crm5.dynamics.com/main.aspx?appid=7c0ada0d-cf0d-f011-998a-6045bd1cb61e&newWindow=true&pagetype=entitylist&etn=crdfd_phieuangky&viewid=ec3c56bb-5723-4663-b1d7-a9c741ff27bd&viewType=1039"
@@ -160,56 +162,54 @@ export const LeaveDashboard: React.FC<LeaveDashboardProps> = ({ employeeId, year
             </div>
 
             {!employeeId && (
-                <div className="welcome-screen">
+                <div className="list-view-empty-state">
                     <p>Vui lòng đăng nhập để xem phiếu đăng ký.</p>
                 </div>
             )}
 
             {loading ? (
-                <div className="loading">
+                <div className="list-view-empty-state">
                     <div className="spinner"></div>
                     <p>Đang tải dữ liệu...</p>
                 </div>
             ) : (
-                <div className="leave-list-container">
+                <div className="list-view-table-wrapper">
                     {/* Registration Tab */}
                     {activeTab === 'registration' && (
                         <>
                             {registrations.length === 0 ? (
-                                <div className="empty-state">
+                                <div className="list-view-empty-state">
                                     <p>Chưa có phiếu đăng ký nào trong tháng này.</p>
                                 </div>
                             ) : (
-                                <div className="table-wrapper">
-                                    <table className="leave-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Loại</th>
-                                                <th>Từ ngày</th>
-                                                <th>Đến ngày</th>
-                                                <th>Số giờ</th>
-                                                <th>Lý do</th>
-                                                <th>Trạng thái</th>
+                                <table className="list-view-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Loại</th>
+                                            <th>Từ ngày</th>
+                                            <th>Đến ngày</th>
+                                            <th className="text-right">Số giờ</th>
+                                            <th>Lý do</th>
+                                            <th>Trạng thái</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {registrations.map((reg) => (
+                                            <tr key={reg.crdfd_phieuangkyid} onClick={() => handleRowClick(reg, 'registration')}>
+                                                <td className="font-medium">{getRegistrationTypeName(reg.crdfd_loaiangky)}</td>
+                                                <td>{formatDate(reg.crdfd_tungay)}</td>
+                                                <td>{formatDate(reg.crdfd_enngay)}</td>
+                                                <td className="text-right">{reg.crdfd_sogio2 || '-'}</td>
+                                                <td className="note-cell">{reg.crdfd_diengiai || '-'}</td>
+                                                <td>
+                                                    <span className={`status-badge ${getStatusClass(reg.crdfd_captrenduyet)}`}>
+                                                        {getApprovalStatusText(reg.crdfd_captrenduyet)}
+                                                    </span>
+                                                </td>
                                             </tr>
-                                        </thead>
-                                        <tbody>
-                                            {registrations.map((reg) => (
-                                                <tr key={reg.crdfd_phieuangkyid} onClick={() => handleRowClick(reg, 'registration')}>
-                                                    <td className="font-medium">{getRegistrationTypeName(reg.crdfd_loaiangky)}</td>
-                                                    <td>{formatDate(reg.crdfd_tungay)}</td>
-                                                    <td>{formatDate(reg.crdfd_enngay)}</td>
-                                                    <td>{reg.crdfd_sogio2 || '-'}</td>
-                                                    <td className="note-cell">{reg.crdfd_diengiai || '-'}</td>
-                                                    <td>
-                                                        <span className={`status-badge ${getStatusClass(reg.crdfd_captrenduyet)}`}>
-                                                            {getApprovalStatusText(reg.crdfd_captrenduyet)}
-                                                        </span>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
+                                        ))}
+                                    </tbody>
+                                </table>
                             )}
                         </>
                     )}
@@ -218,47 +218,45 @@ export const LeaveDashboard: React.FC<LeaveDashboardProps> = ({ employeeId, year
                     {activeTab === 'dntt' && (
                         <>
                             {dnttRecords.length === 0 ? (
-                                <div className="empty-state">
+                                <div className="list-view-empty-state">
                                     <p>Chưa có đề nghị thanh toán nào trong tháng này.</p>
                                 </div>
                             ) : (
-                                <div className="table-wrapper">
-                                    <table className="leave-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Loại hồ sơ</th>
-                                                <th>Số tiền</th>
-                                                <th>Diễn giải</th>
-                                                <th>Ngày tạo</th>
-                                                <th>Trạng thái</th>
-                                                <th>Người tạo</th>
+                                <table className="list-view-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Loại hồ sơ</th>
+                                            <th className="text-right">Số tiền</th>
+                                            <th>Diễn giải</th>
+                                            <th>Ngày tạo</th>
+                                            <th>Trạng thái</th>
+                                            <th>Người tạo</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {dnttRecords.map((dntt) => (
+                                            <tr key={dntt.cr44a_enghithanhtoanid} onClick={() => handleRowClick(dntt, 'dntt')}>
+                                                <td>
+                                                    <span className="badge-reg-type">{dntt.cr1bb_loaihosothanhtoan || '-'}</span>
+                                                </td>
+                                                <td className="amount-cell text-right">
+                                                    {formatCurrency(dntt.cr44a_sotien_de_nghi)}
+                                                </td>
+                                                <td>{dntt.cr1bb_diengiai || '-'}</td>
+                                                <td>
+                                                    {formatDate(dntt.createdon)}
+                                                </td>
+                                                <td>
+                                                    <span className={`status-badge ${dntt.cr44a_trangthai_denghithanhtoan === 'Đã duyệt' ? 'status-approved' :
+                                                        dntt.cr44a_trangthai_denghithanhtoan === 'Từ chối duyệt' ? 'status-rejected' : 'status-pending'}`}>
+                                                        {dntt.cr44a_trangthai_denghithanhtoan || 'N/A'}
+                                                    </span>
+                                                </td>
+                                                <td>{dntt.ownerName || '-'}</td>
                                             </tr>
-                                        </thead>
-                                        <tbody>
-                                            {dnttRecords.map((dntt) => (
-                                                <tr key={dntt.cr44a_enghithanhtoanid} onClick={() => handleRowClick(dntt, 'dntt')}>
-                                                    <td>
-                                                        <span className="badge-reg-type">{dntt.cr1bb_loaihosothanhtoan || '-'}</span>
-                                                    </td>
-                                                    <td className="amount-cell">
-                                                        {formatCurrency(dntt.cr44a_sotien_de_nghi)}
-                                                    </td>
-                                                    <td>{dntt.cr1bb_diengiai || '-'}</td>
-                                                    <td>
-                                                        {formatDate(dntt.createdon)}
-                                                    </td>
-                                                    <td>
-                                                        <span className={`status-badge ${dntt.cr44a_trangthai_denghithanhtoan === 'Đã duyệt' ? 'status-approved' :
-                                                            dntt.cr44a_trangthai_denghithanhtoan === 'Từ chối duyệt' ? 'status-rejected' : 'status-pending'}`}>
-                                                            {dntt.cr44a_trangthai_denghithanhtoan || 'N/A'}
-                                                        </span>
-                                                    </td>
-                                                    <td>{dntt.ownerName || '-'}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
+                                        ))}
+                                    </tbody>
+                                </table>
                             )}
                         </>
                     )}

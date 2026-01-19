@@ -355,6 +355,11 @@ function mergeTimekeepingAndRegistration(
 
     // Helper to add days
     const processRegistration = (reg: PhieuDangKy) => {
+        // Chỉ xử lý phiếu đã được DUYỆT
+        if (reg.crdfd_captrenduyet !== ApprovalStatus.DaDuyet) {
+            return;
+        }
+
         const start = new Date(reg.crdfd_tungay);
         const end = new Date(reg.crdfd_enngay);
 
@@ -366,12 +371,17 @@ function mergeTimekeepingAndRegistration(
             const dateStr = d.toISOString().split('T')[0];
             const existing = recordsMap.get(dateStr);
 
-            // If existing has data (hours > 0), maybe skip? 
-            // Requirement: "tu tinh vao cong" -> implies it counts as work.
-            // If user checked in, we use check-in data. If missing checkin, use registration.
+            // Tạo registration info
+            const registrationInfo = {
+                id: reg.crdfd_phieuangkyid,
+                type: reg.crdfd_loaiangky,
+                typeName: getRegistrationTypeName(reg.crdfd_loaiangky),
+                hours: reg.crdfd_sogio2 || 0,
+                status: getApprovalStatusText(reg.crdfd_captrenduyet)
+            };
 
             if (!existing || existing.hoursWorked === 0) {
-                // Map Registration Type to Status/Work
+                // Ngày không có dữ liệu chấm công - dùng hoàn toàn từ phiếu đăng ký
                 const { status, hours, workVal } = mapRegistrationToStatus(reg.crdfd_loaiangky, reg.crdfd_sogio2);
 
                 recordsMap.set(dateStr, {
@@ -380,22 +390,18 @@ function mergeTimekeepingAndRegistration(
                     status: status,
                     workValue: workVal,
                     note: `DK: ${reg.crdfd_diengiai || ''}`,
-                    registration: {
-                        id: reg.crdfd_phieuangkyid,
-                        type: reg.crdfd_loaiangky,
-                        typeName: getRegistrationTypeName(reg.crdfd_loaiangky),
-                        hours: reg.crdfd_sogio2 || 0,
-                        status: getApprovalStatusText(reg.crdfd_captrenduyet)
-                    }
+                    registration: registrationInfo
                 });
-                if (existing) {
-                    existing.registration = {
-                        id: reg.crdfd_phieuangkyid,
-                        type: reg.crdfd_loaiangky,
-                        typeName: getRegistrationTypeName(reg.crdfd_loaiangky),
-                        hours: reg.crdfd_sogio2 || 0,
-                        status: getApprovalStatusText(reg.crdfd_captrenduyet)
-                    };
+            } else {
+                // Ngày ĐÃ CÓ dữ liệu chấm công - chỉ attach registration info
+                // Trường hợp: nghỉ phép nửa ngày (4h làm việc + 4h nghỉ phép)
+                existing.registration = registrationInfo;
+
+                // Cập nhật note nếu có
+                if (reg.crdfd_diengiai) {
+                    existing.note = existing.note
+                        ? `${existing.note} | DK: ${reg.crdfd_diengiai}`
+                        : `DK: ${reg.crdfd_diengiai}`;
                 }
             }
         }

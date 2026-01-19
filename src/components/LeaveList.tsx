@@ -8,10 +8,15 @@ interface LeaveListProps {
 
 export const LeaveList: React.FC<LeaveListProps> = ({ registrations, onSelect }) => {
     return (
-        <div className="leave-list-container">
-            <h3 className="section-title">Danh sách phiếu đăng ký</h3>
-            <div className="table-wrapper">
-                <table className="leave-table">
+        <div className="leave-list-container list-view-container">
+            <div className="list-view-header">
+                <div className="list-view-toolbar">
+                    <h3 className="list-view-count">Danh sách phiếu đăng ký</h3>
+                </div>
+            </div>
+
+            <div className="list-view-table-wrapper">
+                <table className="list-view-table">
                     <thead>
                         <tr>
                             <th>Nhân viên</th>
@@ -19,13 +24,13 @@ export const LeaveList: React.FC<LeaveListProps> = ({ registrations, onSelect })
                             <th>Thời gian</th>
                             <th>Lý do</th>
                             <th>Trạng thái</th>
-                            <th></th>
+                            <th style={{ width: '40px' }}></th>
                         </tr>
                     </thead>
                     <tbody>
                         {registrations.length === 0 ? (
                             <tr>
-                                <td colSpan={6} className="leave-table-empty">
+                                <td colSpan={6} className="list-view-empty-state">
                                     Không có dữ liệu
                                 </td>
                             </tr>
@@ -34,16 +39,16 @@ export const LeaveList: React.FC<LeaveListProps> = ({ registrations, onSelect })
                                 <tr key={reg.crdfd_phieuangkyid} onClick={() => onSelect(reg)} className="clickable-row">
                                     <td>
                                         <div className="font-medium">{reg.employeeName}</div>
-                                        <div className="text-sm text-gray">{reg.employeeCode}</div>
+                                        <div className="text-sm text-muted">{reg.employeeCode}</div>
                                     </td>
                                     <td>{getTypeName(reg.crdfd_loaiangky)}</td>
                                     <td>
                                         <div>{formatDate(reg.crdfd_tungay)}</div>
                                         {reg.crdfd_tungay !== reg.crdfd_enngay && (
-                                            <div className="text-sm text-gray">→ {formatDate(reg.crdfd_enngay)}</div>
+                                            <div className="text-sm text-muted">→ {formatDate(reg.crdfd_enngay)}</div>
                                         )}
                                         {reg.crdfd_sogio2 && reg.crdfd_sogio2 > 0 && (
-                                            <div className="text-xs badge">{reg.crdfd_sogio2} giờ</div>
+                                            <div className="text-xs badge" style={{ marginTop: '0.25rem', display: 'inline-block' }}>{reg.crdfd_sogio2} giờ</div>
                                         )}
                                     </td>
                                     <td className="note-cell">{reg.crdfd_diengiai}</td>

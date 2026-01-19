@@ -3,7 +3,8 @@ import {
     SearchOutlined,
     LeftOutlined,
     RightOutlined,
-    ReloadOutlined
+    ReloadOutlined,
+    ExportOutlined
 } from '@ant-design/icons';
 import { useMsal } from '@azure/msal-react';
 import {
@@ -163,11 +164,10 @@ export const InventoryCheck: React.FC = () => {
     };
 
     return (
-        <div className="inventory-check">
+        <div className="inventory-check list-view-container">
             {/* Unified Header */}
-            <div className="inventory-check-header">
-                {/* Toolbar */}
-                <div className="inventory-check-toolbar">
+            <div className="list-view-header">
+                <div className="list-view-toolbar">
                     <div className="inventory-check-location-tags">
                         {/* Status Tags */}
                         <button
@@ -195,8 +195,8 @@ export const InventoryCheck: React.FC = () => {
                         ))}
                     </div>
 
-                    <div className="inventory-check-search">
-                        <SearchOutlined className="search-icon" style={{ fontSize: 14 }} />
+                    <div className="list-view-search">
+                        <SearchOutlined className="list-view-search-icon" />
                         <input
                             type="text"
                             placeholder="Tìm mã SP, tên SP..."
@@ -204,8 +204,6 @@ export const InventoryCheck: React.FC = () => {
                             onChange={handleSearch}
                         />
                     </div>
-
-                    {/* Refresh */}
                     <button
                         className="inventory-check-filter-btn"
                         onClick={handleRefresh}
@@ -215,11 +213,21 @@ export const InventoryCheck: React.FC = () => {
                         <ReloadOutlined className={loading ? 'spinning' : ''} style={{ fontSize: 14 }} />
                     </button>
                 </div>
+
+                <div className="list-view-actions">
+                    {/* Refresh */}
+
+                    {totalItems > 0 && (
+                        <span className="list-view-count">
+                            {totalItems} kết quả
+                        </span>
+                    )}
+                </div>
             </div>
 
             {/* Table */}
-            <div className="inventory-check-table-container">
-                <table className="inventory-check-table">
+            <div className="list-view-table-wrapper">
+                <table className="list-view-table">
                     <thead>
                         <tr>
                             <th>Mã sản phẩm</th>
@@ -230,22 +238,23 @@ export const InventoryCheck: React.FC = () => {
                             <th className="text-right">Tồn khả dụng</th>
                             <th className="text-right">Hàng lỗi</th>
                             <th>Vị trí kho</th>
+                            <th className="text-center">Action</th>
                         </tr>
                     </thead>
                     <tbody>
                         {loading && inventoryData.length === 0 ? (
                             <tr>
-                                <td colSpan={8} className="loading-cell">
+                                <td colSpan={9} className="list-view-empty-state">
                                     <ReloadOutlined spin /> Đang tải dữ liệu...
                                 </td>
                             </tr>
                         ) : error ? (
                             <tr>
-                                <td colSpan={8} className="no-data text-danger">{error}</td>
+                                <td colSpan={9} className="list-view-empty-state text-danger">{error}</td>
                             </tr>
                         ) : paginatedData.length === 0 ? (
                             <tr>
-                                <td colSpan={8} className="no-data">Không tìm thấy sản phẩm nào</td>
+                                <td colSpan={9} className="list-view-empty-state">Không tìm thấy sản phẩm nào</td>
                             </tr>
                         ) : (
                             paginatedData.map((item) => (
@@ -262,6 +271,17 @@ export const InventoryCheck: React.FC = () => {
                                         {item.hangLoiSauKiem > 0 ? item.hangLoiSauKiem.toLocaleString() : '-'}
                                     </td>
                                     <td>{item.warehouseLocation}</td>
+                                    <td className="text-center">
+                                        <a
+                                            href={`https://wecare-ii.crm5.dynamics.com/main.aspx?appid=ea83fd87-4b0c-f011-998a-6045bd204b66&pagetype=entityrecord&etn=crdfd_kho_binh_dinh&id=${item.crdfd_kho_binh_dinhid}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="action-icon-link"
+                                            title="Mở trong Dynamics 365"
+                                        >
+                                            <ExportOutlined />
+                                        </a>
+                                    </td>
                                 </tr>
                             ))
                         )}

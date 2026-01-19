@@ -179,22 +179,21 @@ export const AuditLogs: React.FC = () => {
     }
 
     return (
-        <div className="audit-logs">
+        <div className="audit-logs list-view-container">
             {/* Header */}
-            <div className="tab-navigation">
-                <div className="audit-header-content">
-                    <div className="search-container-audit">
-                        <span className="search-icon-audit">🔍</span>
+            <div className="list-view-header">
+                <div className="list-view-toolbar">
+                    <div className="list-view-search">
+                        <span className="list-view-search-icon">🔍</span>
                         <input
                             type="text"
                             placeholder="Tìm kiếm nhân viên, phòng ban, người sửa..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="search-input-audit"
                         />
                         {searchTerm && (
                             <button
-                                className="clear-search-audit"
+                                className="list-view-search-clear"
                                 onClick={() => setSearchTerm('')}
                                 title="Xóa tìm kiếm"
                             >
@@ -203,16 +202,15 @@ export const AuditLogs: React.FC = () => {
                         )}
                     </div>
                     {filteredLogs.length > 0 && (
-                        <span className="audit-results-count">
+                        <span className="list-view-count">
                             {filteredLogs.length} kết quả
                         </span>
                     )}
                 </div>
-                <div className="audit-header-actions">
+                <div className="list-view-actions">
                     <button
                         onClick={handleExportExcel}
-                        className="tab-btn active"
-                        style={{ marginRight: '1rem', padding: '0.4rem 1rem', fontSize: '0.85rem' }}
+                        className="btn btn-primary"
                         title="Xuất file Excel"
                     >
                         <span>📊</span> Xuất Excel
@@ -230,56 +228,54 @@ export const AuditLogs: React.FC = () => {
             </div>
 
             {/* List View */}
-            <div className="leave-list-container">
+            <div className="list-view-table-wrapper">
                 {filteredLogs.length === 0 ? (
-                    <div className="empty-state">
+                    <div className="list-view-empty-state">
                         <p>{searchTerm ? 'Không tìm thấy kết quả phù hợp.' : 'Chưa có dữ liệu audit log.'}</p>
                     </div>
                 ) : (
-                    <div className="table-wrapper">
-                        <table className="leave-table">
-                            <thead>
-                                <tr>
-                                    <th>Nhân viên</th>
-                                    <th>Người chỉnh sửa</th>
-                                    <th>Ngày sửa</th>
-                                    <th>Ngày CC</th>
-                                    <th>Check-in</th>
-                                    <th>Check-out</th>
-                                    <th>Phòng ban</th>
-                                    <th className="audit-actions-col"></th>
+                    <table className="list-view-table">
+                        <thead>
+                            <tr>
+                                <th>Nhân viên</th>
+                                <th>Người chỉnh sửa</th>
+                                <th>Ngày sửa</th>
+                                <th>Ngày CC</th>
+                                <th>Check-in</th>
+                                <th>Check-out</th>
+                                <th>Phòng ban</th>
+                                <th style={{ width: '50px' }}></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filteredLogs.map((log) => (
+                                <tr key={log.id}>
+                                    <td className="font-medium">{log.employee}</td>
+                                    <td>{log.modifiedBy}</td>
+                                    <td>{log.modifiedOn}</td>
+                                    <td>{formatDate(log.checkIn)}</td>
+                                    <td>
+                                        <span className="audit-new-value">{formatTime(log.checkIn)}</span>
+                                    </td>
+                                    <td>
+                                        <span className="audit-new-value">{formatTime(log.checkOut)}</span>
+                                    </td>
+                                    <td>{log.department}</td>
+                                    <td className="text-right">
+                                        <a
+                                            href={`${CRM_BASE_URL}${log.id}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="audit-row-link"
+                                            title="Xem trên CRM"
+                                        >
+                                            👁️
+                                        </a>
+                                    </td>
                                 </tr>
-                            </thead>
-                            <tbody>
-                                {filteredLogs.map((log) => (
-                                    <tr key={log.id}>
-                                        <td className="font-medium">{log.employee}</td>
-                                        <td>{log.modifiedBy}</td>
-                                        <td>{log.modifiedOn}</td>
-                                        <td>{formatDate(log.checkIn)}</td>
-                                        <td>
-                                            <span className="audit-new-value">{formatTime(log.checkIn)}</span>
-                                        </td>
-                                        <td>
-                                            <span className="audit-new-value">{formatTime(log.checkOut)}</span>
-                                        </td>
-                                        <td>{log.department}</td>
-                                        <td className="text-right">
-                                            <a
-                                                href={`${CRM_BASE_URL}${log.id}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="audit-row-link"
-                                                title="Xem trên CRM"
-                                            >
-                                                👁️
-                                            </a>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                            ))}
+                        </tbody>
+                    </table>
                 )}
             </div>
         </div>
