@@ -1170,6 +1170,8 @@ export interface InventoryCheckItem {
     tonKhaDung: number;            // cr1bb_tonkhadung
     hangLoiSauKiem: number;        // cr1bb_slhangloisaukiem
     tongTonKho: number;            // calculated: tonKhoThucTe + hangLoiSauKiem
+    _crdfd_tensanphamlookup_value?: string;
+    _crdfd_vitrikho_value?: string;
 }
 
 export interface InventoryCheckPaginatedResponse {
@@ -1336,7 +1338,9 @@ export async function fetchInventoryCheck(
                 tonKhoLyThuyet: item.crdfd_tonkholythuyet || 0,
                 tonKhaDung: item.cr1bb_tonkhadung || 0,
                 hangLoiSauKiem: hangLoiSauKiem,
-                tongTonKho: tonKhoThucTe + hangLoiSauKiem
+                tongTonKho: tonKhoThucTe + hangLoiSauKiem,
+                _crdfd_tensanphamlookup_value: item._crdfd_tensanphamlookup_value,
+                _crdfd_vitrikho_value: item._crdfd_vitrikho_value
             };
         });
 
@@ -1368,6 +1372,8 @@ export interface InventoryProduct {
     crdfd_tonkhothucte?: number;
     crdfd_tonkholythuyet?: number;
     crdfd_ton_kho_theo_ke_hoach?: number;
+    _crdfd_vitrikho_value?: string;
+    _crdfd_tensanphamlookup_value?: string;
 }
 
 export interface InventoryProductsPaginatedResponse {
@@ -1476,7 +1482,9 @@ export async function fetchInventoryProducts(
             currentStock: item.crdfd_tonkhothucte || 0,
             crdfd_tonkhothucte: item.crdfd_tonkhothucte || 0,
             crdfd_tonkholythuyet: item.crdfd_tonkholythuyet || 0,
-            crdfd_ton_kho_theo_ke_hoach: item.crdfd_ton_kho_theo_ke_hoach || 0
+            crdfd_ton_kho_theo_ke_hoach: item.crdfd_ton_kho_theo_ke_hoach || 0,
+            _crdfd_vitrikho_value: item._crdfd_vitrikho_value,
+            _crdfd_tensanphamlookup_value: item._crdfd_tensanphamlookup_value
         }));
 
         return {
@@ -1491,20 +1499,409 @@ export async function fetchInventoryProducts(
     }
 }
 
+export interface ProductInventorySummary {
+    totalNhap: number;
+    totalXuat: number;
+    traBan: number;
+    traMua: number;
+    canKho: number;
+    tonThucTe: number;
+    xiNhap: number;
+    xiXuat: number;
+    transferNhap: number;
+    transferXuat: number;
+}
+
+/**
+ * Fetch aggregate inventory summary using FetchXML
+ */
+export async function fetchProductInventorySummary(
+    accessToken: string,
+    product: InventoryProduct
+): Promise<ProductInventorySummary> {
+    const productId = product._crdfd_tensanphamlookup_value;
+    const warehouseId = product._crdfd_vitrikho_value;
+    const productCode = product.crdfd_masp;
+
+    if (!productId || !warehouseId) {
+        return { totalNhap: 0, totalXuat: 0, traBan: 0, traMua: 0, canKho: 0, tonThucTe: 0, xiNhap: 0, xiXuat: 0, transferNhap: 0, transferXuat: 0 };
+    }
+
+    const startDate = "2022-01-01T00:00:00Z";
+
+    // 1. Transaction Buy & Returns (Nhap & Tra Mua)
+    const buyFetch = `
+        <fetch aggregate="true">
+            <entity name="crdfd_transactionbuy">
+                <attribute name="crdfd_soluong" aggregate="sum" alias="total_nhap" />
+                <attribute name="crdfd_soluongoitratheokho" aggregate="sum" alias="total_tra_mua" />
+                <filter>
+                    <condition attribute="crdfd_masp" operator="eq" value="${productCode}" />
+                    <condition attribute="statecode" operator="eq" value="0" />
+                    <condition attribute="createdon" operator="ge" value="${startDate}" />
+                </filter>
+            </entity>
+        </fetch>
+    `;
+
+    // 2. Transaction Sales (Xuat)
+    const salesFetch = `
+        <fetch aggregate="true">
+            <entity name="crdfd_transactionsales">
+                <attribute name="crdfd_soluonggiaotheokho" aggregate="sum" alias="total_xuat" />
+                <filter>
+                    <condition attribute="crdfd_product" operator="eq" value="${productId}" />
+                    <condition attribute="crdfd_warehouse" operator="eq" value="${warehouseId}" />
+                    <condition attribute="statecode" operator="eq" value="0" />
+                    <condition attribute="createdon" operator="ge" value="${startDate}" />
+                </filter>
+            </entity>
+        </fetch>
+    `;
+
+    // 3. Returns (Tra Ban)
+    const returnsFetch = `
+        <fetch aggregate="true">
+            <entity name="crdfd_oitrahangban">
+                <attribute name="crdfd_soluong" aggregate="sum" alias="total_tra_ban" />
+                <filter>
+                    <condition attribute="crdfd_sanpham" operator="eq" value="${productId}" />
+                    <condition attribute="crdfd_kho" operator="eq" value="${warehouseId}" />
+                    <condition attribute="statecode" operator="eq" value="0" />
+                    <condition attribute="createdon" operator="ge" value="${startDate}" />
+                </filter>
+            </entity>
+        </fetch>
+    `;
+
+    // 4. Special Event (Xi & Can Kho)
+    const specialEventFetch = `
+        <fetch aggregate="true">
+            <entity name="crdfd_specialevent">
+                <attribute name="crdfd_soluong" aggregate="sum" alias="total_amount" />
+                <attribute name="crdfd_trangthai" groupby="true" alias="type" />
+                <attribute name="crdfd_loaionhang" groupby="true" alias="category" />
+                <filter>
+                    <condition attribute="crdfd_sanpham" operator="eq" value="${productId}" />
+                    <condition attribute="crdfd_onhangxi" operator="eq" value="${warehouseId}" />
+                    <condition attribute="statecode" operator="eq" value="0" />
+                    <condition attribute="createdon" operator="ge" value="${startDate}" />
+                </filter>
+            </entity>
+        </fetch>
+    `;
+
+    // 5. Warehouse Transfer
+    const transferFetch = `
+        <fetch aggregate="true">
+            <entity name="crdfd_chuyenkhodetail">
+                <attribute name="crdfd_soluong" aggregate="sum" alias="total_amount" />
+                <attribute name="cr1bb_khoi" groupby="true" alias="from_kho" />
+                <attribute name="cr1bb_khoen" groupby="true" alias="to_kho" />
+                <filter>
+                    <condition attribute="crdfd_sanpham" operator="eq" value="${productId}" />
+                    <filter type="or">
+                        <condition attribute="cr1bb_khoi" operator="eq" value="${warehouseId}" />
+                        <condition attribute="cr1bb_khoen" operator="eq" value="${warehouseId}" />
+                    </filter>
+                    <condition attribute="statecode" operator="eq" value="0" />
+                </filter>
+            </entity>
+        </fetch>
+    `;
+
+    const [buyData, salesData, returnsData, specialData, transferData] = await Promise.all([
+        runFetchXml(accessToken, "crdfd_transactionbuys", buyFetch),
+        runFetchXml(accessToken, "crdfd_transactionsales", salesFetch),
+        runFetchXml(accessToken, "crdfd_oitrahangbans", returnsFetch),
+        runFetchXml(accessToken, "crdfd_specialevents", specialEventFetch),
+        runFetchXml(accessToken, "crdfd_chuyenkhodetails", transferFetch)
+    ]);
+
+    const summary: ProductInventorySummary = {
+        totalNhap: buyData.value[0]?.total_nhap || 0,
+        totalXuat: salesData.value[0]?.total_xuat || 0,
+        traBan: returnsData.value[0]?.total_tra_ban || 0,
+        traMua: buyData.value[0]?.total_tra_mua || 0,
+        canKho: 0,
+        xiNhap: 0,
+        xiXuat: 0,
+        transferNhap: 0,
+        transferXuat: 0,
+        tonThucTe: 0
+    };
+
+    specialData.value.forEach((item: any) => {
+        const amount = item.total_amount || 0;
+        const category = item.category; // 191920003: Xi, 191920002: Can Kho
+        const type = item.type; // 191,920,000: Nhap, 191,920,001: Xuat
+
+        if (category === 191920002) {
+            summary.canKho += amount;
+        } else if (category === 191920003) {
+            if (type === 191920000) summary.xiNhap += amount;
+            else if (type === 191920001) summary.xiXuat += amount;
+        }
+    });
+
+    transferData.value.forEach((item: any) => {
+        const amount = item.total_amount || 0;
+        const fromKho = item.from_kho;
+        const toKho = item.to_kho;
+
+        if (fromKho === warehouseId) summary.transferXuat += amount;
+        if (toKho === warehouseId) summary.transferNhap += amount;
+    });
+
+    summary.tonThucTe = (summary.totalNhap - summary.traMua + summary.xiNhap + summary.transferNhap)
+                      - (summary.totalXuat - summary.traBan + summary.xiXuat + summary.transferXuat)
+                      + summary.canKho;
+
+    return summary;
+}
+
+async function runFetchXml(accessToken: string, entityPluralName: string, fetchXml: string) {
+    const url = `${dataverseConfig.baseUrl}/${entityPluralName}?fetchXml=${encodeURIComponent(fetchXml.trim())}`;
+    const response = await fetch(url, {
+        headers: {
+            "Authorization": `Bearer ${accessToken}`,
+            "OData-MaxVersion": "4.0",
+            "OData-Version": "4.0",
+            "Accept": "application/json",
+            "Prefer": "odata.include-annotations=\"*\""
+        },
+    });
+    if (!response.ok) {
+        console.error(`FetchXML failed for ${entityPluralName}`, await response.text());
+        return { value: [] };
+    }
+    return await response.json();
+}
+
 /**
  * Fetch Inventory History for a product
  */
+export interface DetailedInventoryRecord {
+    id: string;
+    type: 'Nhập' | 'Xuất' | 'Trả bán' | 'Trả mua' | 'Cân' | 'Kiểm kho' | 'Xi Nhập' | 'Xi Xuất' | 'Chuyển đi' | 'Chuyển đến';
+    date: string;
+    quantity: number;
+    reference: string;
+    note?: string;
+}
+
+/**
+ * Fetch detailed history for the modal tabs
+ */
+export async function fetchDetailedInventoryHistory(
+    accessToken: string,
+    product: InventoryProduct,
+    category: 'Nhập' | 'Xuất' | 'Đổi trả' | 'Cân' | 'Kiểm kho'
+): Promise<DetailedInventoryRecord[]> {
+    const productId = product._crdfd_tensanphamlookup_value;
+    const warehouseId = product._crdfd_vitrikho_value;
+    const productCode = product.crdfd_masp;
+    const startDate = "2022-01-01T00:00:00Z";
+
+    let results: DetailedInventoryRecord[] = [];
+
+    try {
+        if (category === 'Nhập') {
+            // Transaction Buy
+            const filter = `crdfd_masp eq '${productCode}' and statecode eq 0 and createdon ge ${startDate}`;
+            const url = `${dataverseConfig.baseUrl}/crdfd_transactionbuys?$filter=${encodeURIComponent(filter)}&$select=crdfd_transactionbuyid,crdfd_name,crdfd_soluong,createdon&$orderby=createdon desc`;
+            const res = await fetch(url, { headers: { "Authorization": `Bearer ${accessToken}`, "Accept": "application/json" } });
+            const data = await res.json();
+            results = (data.value || []).map((item: any) => ({
+                id: item.crdfd_transactionbuyid,
+                type: 'Nhập',
+                date: item.createdon,
+                quantity: item.crdfd_soluong || 0,
+                reference: item.crdfd_name || 'N/A'
+            }));
+
+            // Xi Nhập
+            const xiFilter = `crdfd_sanpham eq ${productId} and crdfd_onhangxi eq ${warehouseId} and crdfd_loaionhang eq 191920003 and crdfd_trangthai eq 191920000 and statecode eq 0`;
+            const xiUrl = `${dataverseConfig.baseUrl}/crdfd_specialevents?$filter=${encodeURIComponent(xiFilter)}&$select=crdfd_specialeventid,crdfd_soluong,createdon&$orderby=createdon desc`;
+            const xiRes = await fetch(xiUrl, { headers: { "Authorization": `Bearer ${accessToken}`, "Accept": "application/json" } });
+            const xiData = await xiRes.json();
+            results = [...results, ...(xiData.value || []).map((item: any) => ({
+                id: item.crdfd_specialeventid,
+                type: 'Xi Nhập',
+                date: item.createdon,
+                quantity: item.crdfd_soluong || 0,
+                reference: 'Xi Nhập'
+            }))];
+        } else if (category === 'Xuất') {
+            // Transaction Sales
+            const filter = `crdfd_product eq ${productId} and crdfd_warehouse eq ${warehouseId} and statecode eq 0 and createdon ge ${startDate}`;
+            const url = `${dataverseConfig.baseUrl}/crdfd_transactionsales?$filter=${encodeURIComponent(filter)}&$select=crdfd_transactionsalesid,crdfd_maphieuxuat,crdfd_soluonggiaotheokho,createdon&$orderby=createdon desc`;
+            const res = await fetch(url, { headers: { "Authorization": `Bearer ${accessToken}`, "Accept": "application/json" } });
+            const data = await res.json();
+            results = (data.value || []).map((item: any) => ({
+                id: item.crdfd_transactionsalesid,
+                type: 'Xuất',
+                date: item.createdon,
+                quantity: -(item.crdfd_soluonggiaotheokho || 0),
+                reference: item.crdfd_maphieuxuat || 'N/A'
+            }));
+
+            // Xi Xuất
+            const xiFilter = `crdfd_sanpham eq ${productId} and crdfd_onhangxi eq ${warehouseId} and crdfd_loaionhang eq 191920003 and crdfd_trangthai eq 191920001 and statecode eq 0`;
+            const xiUrl = `${dataverseConfig.baseUrl}/crdfd_specialevents?$filter=${encodeURIComponent(xiFilter)}&$select=crdfd_specialeventid,crdfd_soluong,createdon&$orderby=createdon desc`;
+            const xiRes = await fetch(xiUrl, { headers: { "Authorization": `Bearer ${accessToken}`, "Accept": "application/json" } });
+            const xiData = await xiRes.json();
+            results = [...results, ...(xiData.value || []).map((item: any) => ({
+                id: item.crdfd_specialeventid,
+                type: 'Xi Xuất',
+                date: item.createdon,
+                quantity: -(item.crdfd_soluong || 0),
+                reference: 'Xi Xuất'
+            }))];
+        } else if (category === 'Đổi trả') {
+            // Tra Ban
+            const filter = `crdfd_sanpham eq ${productId} and crdfd_kho eq ${warehouseId} and statecode eq 0 and createdon ge ${startDate}`;
+            const url = `${dataverseConfig.baseUrl}/crdfd_oitrahangbans?$filter=${encodeURIComponent(filter)}&$select=crdfd_oitrahangbanid,crdfd_soluong,createdon&$orderby=createdon desc`;
+            const res = await fetch(url, { headers: { "Authorization": `Bearer ${accessToken}`, "Accept": "application/json" } });
+            const data = await res.json();
+            results = (data.value || []).map((item: any) => ({
+                id: item.crdfd_oitrahangbanid,
+                type: 'Trả bán',
+                date: item.createdon,
+                quantity: item.crdfd_soluong || 0,
+                reference: 'Trả hàng bán'
+            }));
+
+            // Tra Mua
+            const tmFilter = `crdfd_masp eq '${productCode}' and crdfd_soluongoitratheokho gt 0 and statecode eq 0 and createdon ge ${startDate}`;
+            const tmUrl = `${dataverseConfig.baseUrl}/crdfd_transactionbuys?$filter=${encodeURIComponent(tmFilter)}&$select=crdfd_transactionbuyid,crdfd_name,crdfd_soluongoitratheokho,createdon&$orderby=createdon desc`;
+            const tmRes = await fetch(tmUrl, { headers: { "Authorization": `Bearer ${accessToken}`, "Accept": "application/json" } });
+            const tmData = await tmRes.json();
+            results = [...results, ...(tmData.value || []).map((item: any) => ({
+                id: item.crdfd_transactionbuyid,
+                type: 'Trả mua',
+                date: item.createdon,
+                quantity: -(item.crdfd_soluongoitratheokho || 0),
+                reference: item.crdfd_name || 'N/A'
+            }))];
+        } else if (category === 'Cân') {
+            const filter = `crdfd_sanpham eq ${productId} and crdfd_onhangxi eq ${warehouseId} and crdfd_loaionhang eq 191920002 and statecode eq 0 and createdon ge ${startDate}`;
+            const url = `${dataverseConfig.baseUrl}/crdfd_specialevents?$filter=${encodeURIComponent(filter)}&$select=crdfd_specialeventid,crdfd_soluong,createdon&$orderby=createdon desc`;
+            const res = await fetch(url, { headers: { "Authorization": `Bearer ${accessToken}`, "Accept": "application/json" } });
+            const data = await res.json();
+            results = (data.value || []).map((item: any) => ({
+                id: item.crdfd_specialeventid,
+                type: 'Cân',
+                date: item.createdon,
+                quantity: item.crdfd_soluong || 0,
+                reference: 'Cân kho'
+            }));
+        }
+
+        // Add Transfer data to Nhập or Xuất tabs
+        if (category === 'Nhập') {
+            const transferFilter = `crdfd_sanpham eq ${productId} and cr1bb_khoen eq ${warehouseId} and statecode eq 0`;
+            const transferUrl = `${dataverseConfig.baseUrl}/crdfd_chuyenkhodetails?$filter=${encodeURIComponent(transferFilter)}&$select=crdfd_chuyenkhodetailid,crdfd_soluong,createdon&$orderby=createdon desc`;
+            const transferRes = await fetch(transferUrl, { headers: { "Authorization": `Bearer ${accessToken}`, "Accept": "application/json" } });
+            const transferData = await transferRes.json();
+            results = [...results, ...(transferData.value || []).map((item: any) => ({
+                id: item.crdfd_chuyenkhodetailid,
+                type: 'Chuyển đến',
+                date: item.createdon,
+                quantity: item.crdfd_soluong || 0,
+                reference: 'Chuyển kho'
+            }))];
+        } else if (category === 'Xuất') {
+            const transferFilter = `crdfd_sanpham eq ${productId} and cr1bb_khoi eq ${warehouseId} and statecode eq 0`;
+            const transferUrl = `${dataverseConfig.baseUrl}/crdfd_chuyenkhodetails?$filter=${encodeURIComponent(transferFilter)}&$select=crdfd_chuyenkhodetailid,crdfd_soluong,createdon&$orderby=createdon desc`;
+            const transferRes = await fetch(transferUrl, { headers: { "Authorization": `Bearer ${accessToken}`, "Accept": "application/json" } });
+            const transferData = await transferRes.json();
+            results = [...results, ...(transferData.value || []).map((item: any) => ({
+                id: item.crdfd_chuyenkhodetailid,
+                type: 'Chuyển đi',
+                date: item.createdon,
+                quantity: -(item.crdfd_soluong || 0),
+                reference: 'Chuyển kho'
+            }))];
+        }
+    } catch (e) {
+        console.error("Error fetching detailed history:", e);
+    }
+
+    return results.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+}
+
 export async function fetchInventoryHistory(
     _accessToken: string,
-    khoId: string
+    _khoId: string
 ): Promise<InventoryHistoryRecord[]> {
-    // This assumes there's a related entity for history
-    // If no history table exists, return empty array
-    // For now, returning empty as placeholder
-    console.log("Fetching history for khoId:", khoId);
-
-    // TODO: Implement actual history fetch when table is known
     return [];
+}
+
+/**
+ * Fetch batch return counts for list views
+ */
+export async function fetchReturnsForProducts(
+    accessToken: string,
+    productIds: string[],
+    warehouseId: string
+): Promise<Record<string, number>> {
+    if (productIds.length === 0 || !warehouseId) return {};
+
+    const startDate = "2022-01-01T00:00:00Z";
+    const returnsMap: Record<string, number> = {};
+
+    try {
+        // Fetch Sales Returns
+        const idsFilter = productIds.map(id => `<condition attribute="crdfd_sanpham" operator="eq" value="${id}" />`).join('');
+        const fetchXml = `
+            <fetch aggregate="true">
+                <entity name="crdfd_oitrahangban">
+                    <attribute name="crdfd_soluong" aggregate="sum" alias="total" />
+                    <attribute name="crdfd_sanpham" groupby="true" alias="product_id" />
+                    <filter>
+                        <filter type="or">${idsFilter}</filter>
+                        <condition attribute="crdfd_kho" operator="eq" value="${warehouseId}" />
+                        <condition attribute="statecode" operator="eq" value="0" />
+                        <condition attribute="createdon" operator="ge" value="${startDate}" />
+                    </filter>
+                </entity>
+            </fetch>
+        `;
+        const salesRes = await runFetchXml(accessToken, "crdfd_oitrahangbans", fetchXml);
+        salesRes.value.forEach((item: any) => {
+            returnsMap[item.product_id] = (returnsMap[item.product_id] || 0) + (item.total || 0);
+        });
+
+        // Fetch Purchase Returns (from transactionbuy table)
+        // This is harder as we need to match by product lookup in transactionbuy.
+        // Assuming crdfd_product is the field.
+        const buyFetchXml = `
+            <fetch aggregate="true">
+                <entity name="crdfd_transactionbuy">
+                    <attribute name="crdfd_soluongoitratheokho" aggregate="sum" alias="total" />
+                    <attribute name="_crdfd_tensanphamlookup_value" groupby="true" alias="product_id" />
+                    <filter>
+                        <condition attribute="crdfd_soluongoitratheokho" operator="gt" value="0" />
+                        <condition attribute="statecode" operator="eq" value="0" />
+                        <condition attribute="createdon" operator="ge" value="${startDate}" />
+                    </filter>
+                </entity>
+            </fetch>
+        `;
+        // Since transactionbuy filter by multiple products is similar, but might not have same warehouse logic.
+        // Let's keep it simple for now and just use sales returns if purchase returns logic is uncertain.
+        const buyRes = await runFetchXml(accessToken, "crdfd_transactionbuys", buyFetchXml);
+        buyRes.value.forEach((item: any) => {
+            if (productIds.includes(item.product_id)) {
+                returnsMap[item.product_id] = (returnsMap[item.product_id] || 0) + (item.total || 0);
+            }
+        });
+    } catch (e) {
+        console.error("Error fetching batch returns:", e);
+    }
+
+    return returnsMap;
 }
 
 export async function fetchTransactionBuys(

@@ -6,7 +6,8 @@ import {
     fetchWarehouseLocations,
     getAccessToken,
     InventoryProduct,
-    InventoryProductsPaginatedResponse
+    InventoryProductsPaginatedResponse,
+    fetchReturnsForProducts
 } from '../../services/dataverseService';
 import { InventoryHistoryModal } from './InventoryHistoryModal';
 
@@ -18,6 +19,7 @@ interface LocationOption {
 export const ProductsList: React.FC = () => {
     const { instance, accounts } = useMsal();
     const [data, setData] = useState<InventoryProduct[]>([]);
+    const [returnsMap, setReturnsMap] = useState<Record<string, number>>({});
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -96,6 +98,18 @@ export const ProductsList: React.FC = () => {
             );
 
             setData(response.data);
+
+            // Fetch returns for the current page
+            const productIds = response.data
+                .map(p => p._crdfd_tensanphamlookup_value)
+                .filter((id): id is string => !!id);
+
+            if (productIds.length > 0 && selectedLocation) {
+                const retMap = await fetchReturnsForProducts(accessToken, productIds, selectedLocation);
+                setReturnsMap(retMap);
+            } else {
+                setReturnsMap({});
+            }
             setTotalCount(response.totalCount);
             setHasNextPage(response.hasNextPage);
             setHasPreviousPage(response.hasPreviousPage);
@@ -303,6 +317,12 @@ export const ProductsList: React.FC = () => {
                                                         (row.crdfd_tonkhothucte ?? 0) === 0 ? 'text-orange-400' : 'text-green-400'
                                                         }`}>
                                                         {(row.crdfd_tonkhothucte ?? 0).toLocaleString()}
+                                                    </span>
+                                                </div>
+                                                <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-orange-500/80">
+                                                    <span>Đổi trả</span>
+                                                    <span className="text-[12px] font-mono font-bold">
+                                                        {returnsMap[row._crdfd_tensanphamlookup_value || '']?.toLocaleString() || '0'}
                                                     </span>
                                                 </div>
                                                 <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-[#71717a]">

@@ -13,7 +13,8 @@ import {
     fetchWarehouseLocationsForFilter,
     InventoryCheckItem,
     InventoryCheckPaginatedResponse,
-    WarehouseLocationOption
+    WarehouseLocationOption,
+    fetchReturnsForProducts
 } from '../../services/dataverseService';
 
 const ITEMS_PER_PAGE = 20;
@@ -28,6 +29,7 @@ export const InventoryCheck: React.FC = () => {
 
     // Data states
     const [inventoryData, setInventoryData] = useState<InventoryCheckItem[]>([]);
+    const [returnsMap, setReturnsMap] = useState<Record<string, number>>({});
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -88,6 +90,17 @@ export const InventoryCheck: React.FC = () => {
             );
 
             setInventoryData(response.data);
+
+            const productIds = response.data
+                .map(p => p._crdfd_tensanphamlookup_value)
+                .filter((id): id is string => !!id);
+
+            if (productIds.length > 0 && selectedLocations.length === 1) {
+                const retMap = await fetchReturnsForProducts(token, productIds, selectedLocations[0]);
+                setReturnsMap(retMap);
+            } else {
+                setReturnsMap({});
+            }
         } catch (err) {
             console.error("Error loading inventory:", err);
             setError("Không thể tải dữ liệu tồn kho");
@@ -234,6 +247,7 @@ export const InventoryCheck: React.FC = () => {
                             <th>Tên sản phẩm</th>
                             <th>ĐVT</th>
                             <th className="text-right">Tồn thực tế</th>
+                            <th className="text-right">Đổi trả</th>
                             <th className="text-right">Tồn lý thuyết</th>
                             <th className="text-right">Tồn khả dụng</th>
                             <th className="text-right">Hàng lỗi</th>
@@ -264,6 +278,9 @@ export const InventoryCheck: React.FC = () => {
                                     <td>Cái</td>
                                     <td className={`text-right ${item.tonKhoThucTe < 0 ? 'text-danger' : ''}`}>
                                         {item.tonKhoThucTe.toLocaleString()}
+                                    </td>
+                                    <td className="text-right text-orange-500">
+                                        {returnsMap[item._crdfd_tensanphamlookup_value || '']?.toLocaleString() || '0'}
                                     </td>
                                     <td className="text-right">{item.tonKhoLyThuyet.toLocaleString()}</td>
                                     <td className="text-right">{item.tonKhaDung.toLocaleString()}</td>
