@@ -1,11 +1,11 @@
 import React, { useMemo } from 'react';
-import { TeamRegistration, ApprovalStatus } from '../services/dataverseService';
+import { TeamRegistration, ApprovalStatus } from '../services/dataverse';
 
 interface LeaveStatsProps {
     registrations: TeamRegistration[];
 }
 
-export const LeaveStats: React.FC<LeaveStatsProps> = ({ registrations }) => {
+export const LeaveStats: React.FC<LeaveStatsProps> = React.memo(({ registrations }) => {
     const stats = useMemo(() => {
         const total = registrations.length;
         const pending = registrations.filter(r => r.crdfd_captrenduyet === ApprovalStatus.ChuaDuyet).length;
@@ -56,7 +56,7 @@ export const LeaveStats: React.FC<LeaveStatsProps> = ({ registrations }) => {
             </div>
         </div>
     );
-};
+});
 
 function getTypeName(type: number): string {
     switch (type) {

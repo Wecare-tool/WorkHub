@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Filter, Columns, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useMsal } from '@azure/msal-react';
-import { fetchTransactionSales, getAccessToken, TransactionSales, TransactionSalesPaginatedResponse } from '../../services/dataverseService';
+import { fetchTransactionSales, getAccessToken, TransactionSales, TransactionSalesPaginatedResponse } from '../../services/dataverse';
 
 interface DataTrackerTableProps {
     selectedTable: string;

@@ -7,7 +7,7 @@ interface WorkSummaryProps {
     month: number;
 }
 
-export const WorkSummary: React.FC<WorkSummaryProps> = ({ summary, year, month }) => {
+export const WorkSummary: React.FC<WorkSummaryProps> = React.memo(({ summary, year, month }) => {
     const percentage = summary.standardDays > 0
         ? Math.round((summary.actualDays / summary.standardDays) * 100)
         : 0;
@@ -106,4 +106,4 @@ export const WorkSummary: React.FC<WorkSummaryProps> = ({ summary, year, month }
             )}
         </div>
     );
-};
+});

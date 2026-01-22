@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { X, ArrowDownLeft, ArrowUpRight, RotateCcw, ClipboardList, Scale, Package } from 'lucide-react';
 import { useMsal } from '@azure/msal-react';
-import { getAccessToken, fetchInventoryHistory, InventoryProduct, InventoryHistorySummary, InventoryHistoryExtendedRecord } from '../../services/dataverseService';
+import { getAccessToken, fetchInventoryHistory, InventoryProduct, InventoryHistorySummary, InventoryHistoryExtendedRecord } from '../../services/dataverse';
 
 interface InventoryHistoryModalProps {
     product: InventoryProduct;
@@ -38,8 +38,8 @@ export const InventoryHistoryModal: React.FC<InventoryHistoryModalProps> = ({ pr
         loadHistory();
     }, [product, accounts, instance]);
 
-    // Filter records for tabs
-    const getTabRecords = () => {
+    // OPTIMIZED: Memoize filtered records to avoid re-filtering on every render
+    const tabRecords = useMemo(() => {
         switch (activeTab) {
             case 'export':
                 return records.filter(r => r.type === 'Xuất');
@@ -54,7 +54,16 @@ export const InventoryHistoryModal: React.FC<InventoryHistoryModalProps> = ({ pr
             default:
                 return [];
         }
-    };
+    }, [records, activeTab]);
+
+    // OPTIMIZED: Memoize tab counts to avoid re-filtering on every render
+    const tabCounts = useMemo(() => ({
+        export: records.filter(r => r.type === 'Xuất').length,
+        import: records.filter(r => r.type === 'Nhập').length,
+        return: records.filter(r => (r.quantityReturn && r.quantityReturn > 0)).length,
+        check: records.filter(r => r.type === 'Kiểm kho').length,
+        balance: records.filter(r => r.type === 'Cân kho').length
+    }), [records]);
 
     const formatNumber = (num?: number) => num ? num.toLocaleString('vi-VN') : '0';
 
@@ -155,11 +164,11 @@ export const InventoryHistoryModal: React.FC<InventoryHistoryModalProps> = ({ pr
 
                 {/* Tabs Navigation */}
                 <div className="flex border-b px-4 mt-2">
-                    <TabButton active={activeTab === 'export'} onClick={() => setActiveTab('export')} label="Xuất hàng" icon={<ArrowUpRight size={16} />} count={records.filter(r => r.type === 'Xuất').length} />
-                    <TabButton active={activeTab === 'import'} onClick={() => setActiveTab('import')} label="Nhập hàng" icon={<ArrowDownLeft size={16} />} count={records.filter(r => r.type === 'Nhập').length} />
-                    <TabButton active={activeTab === 'return'} onClick={() => setActiveTab('return')} label="Đổi trả" icon={<RotateCcw size={16} />} count={records.filter(r => (r.quantityReturn && r.quantityReturn > 0)).length} />
-                    <TabButton active={activeTab === 'check'} onClick={() => setActiveTab('check')} label="Kiểm kho" icon={<ClipboardList size={16} />} count={records.filter(r => r.type === 'Kiểm kho').length} />
-                    <TabButton active={activeTab === 'balance'} onClick={() => setActiveTab('balance')} label="Lịch sử cân kho" icon={<Scale size={16} />} count={records.filter(r => r.type === 'Cân kho').length} />
+                    <TabButton active={activeTab === 'export'} onClick={() => setActiveTab('export')} label="Xuất hàng" icon={<ArrowUpRight size={16} />} count={tabCounts.export} />
+                    <TabButton active={activeTab === 'import'} onClick={() => setActiveTab('import')} label="Nhập hàng" icon={<ArrowDownLeft size={16} />} count={tabCounts.import} />
+                    <TabButton active={activeTab === 'return'} onClick={() => setActiveTab('return')} label="Đổi trả" icon={<RotateCcw size={16} />} count={tabCounts.return} />
+                    <TabButton active={activeTab === 'check'} onClick={() => setActiveTab('check')} label="Kiểm kho" icon={<ClipboardList size={16} />} count={tabCounts.check} />
+                    <TabButton active={activeTab === 'balance'} onClick={() => setActiveTab('balance')} label="Lịch sử cân kho" icon={<Scale size={16} />} count={tabCounts.balance} />
                 </div>
 
                 {/* Content Area */}
@@ -183,8 +192,8 @@ export const InventoryHistoryModal: React.FC<InventoryHistoryModalProps> = ({ pr
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
-                                    {getTabRecords().length > 0 ? (
-                                        getTabRecords().map((record) => (
+                                    {tabRecords.length > 0 ? (
+                                        tabRecords.map((record) => (
                                             <tr key={record.id} className="hover:bg-gray-50 transition-colors">
                                                 <td className="px-4 py-3 text-gray-600">
                                                     {new Date(record.date).toLocaleDateString('vi-VN')} <span className="text-xs text-gray-400 ml-1">{new Date(record.date).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</span>

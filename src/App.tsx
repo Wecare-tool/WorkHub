@@ -1,24 +1,27 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, Suspense, lazy } from 'react';
 import { useMsal, useIsAuthenticated } from '@azure/msal-react';
 import { InteractionStatus } from '@azure/msal-browser';
 
 import { Header } from './components/Header';
 import { Calendar } from './components/Calendar';
 import { Sidebar } from './components/Sidebar';
-import { LeaveDashboard } from './components/LeaveDashboard';
-import { AuditLogs } from './components/AuditLogs';
-import { Management } from './components/Management';
-import { Tools } from './components/Tools';
 import { DayDetail } from './components/DayDetail';
 import { WorkSummary } from './components/WorkSummary';
-import { WarehouseLayout } from './components/Warehouse/WarehouseLayout';
-import { InventoryCheck } from './components/Warehouse/InventoryCheck';
+
+// Lazy load route components
+const LeaveDashboard = lazy(() => import('./components/LeaveDashboard').then(m => ({ default: m.LeaveDashboard })));
+const AuditLogs = lazy(() => import('./components/AuditLogs').then(m => ({ default: m.AuditLogs })));
+const Management = lazy(() => import('./components/Management').then(m => ({ default: m.Management })));
+const Tools = lazy(() => import('./components/Tools').then(m => ({ default: m.Tools })));
+const WarehouseLayout = lazy(() => import('./components/Warehouse/WarehouseLayout').then(m => ({ default: m.WarehouseLayout })));
+const InventoryCheck = lazy(() => import('./components/Warehouse/InventoryCheck').then(m => ({ default: m.InventoryCheck })));
 
 import { DayRecord, MonthSummary } from './types/types';
 import { calculateMonthSummary } from './utils/workUtils';
-import { fetchChamCongData, getAccessToken, fetchEmployeeIdFromSystemUser } from './services/dataverseService';
+import { fetchChamCongData, getAccessToken, fetchEmployeeIdFromSystemUser } from './services/dataverse';
 import { dataverseConfig } from './config/authConfig';
 import { ThemeProvider } from './context/ThemeContext';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import './index.css';
 
 function App() {
@@ -136,7 +139,7 @@ function App() {
         } as DayRecord);
     }, [records, selectedDate]);
 
-    const getHeaderTitle = () => {
+    const getHeaderTitle = useMemo(() => {
         switch (currentViewState) {
             case 'personal': return 'TimeSheet';
             case 'team': return 'Adjustment Request';
@@ -149,11 +152,12 @@ function App() {
             case 'inventory-check': return 'Check tồn kho';
             default: return 'WorkHub';
         }
-    };
+    }, [currentViewState]);
 
     return (
         <ThemeProvider>
-            <div className="app">
+            <ErrorBoundary>
+                <div className="app">
                 <Sidebar
                     currentView={currentViewState}
                     onChangeView={setCurrentViewState}
@@ -168,7 +172,7 @@ function App() {
                         year={year}
                         month={month}
                         onMonthChange={handleMonthChange}
-                        title={getHeaderTitle()}
+                        title={getHeaderTitle}
                         showDateNav={currentViewState === 'personal' || currentViewState === 'team'}
                     />
 
@@ -227,30 +231,42 @@ function App() {
                         </>
                     ) : currentViewState === 'team' ? (
                         <div className="main-content">
-                            <LeaveDashboard employeeId={employeeId} year={year} month={month} />
+                            <Suspense fallback={<div className="loading"><div className="spinner"></div><p>Đang tải...</p></div>}>
+                                <LeaveDashboard employeeId={employeeId} year={year} month={month} />
+                            </Suspense>
                         </div>
                     ) : currentViewState === 'audit' ? (
                         <main className="main-content">
-                            <AuditLogs />
+                            <Suspense fallback={<div className="loading"><div className="spinner"></div><p>Đang tải...</p></div>}>
+                                <AuditLogs />
+                            </Suspense>
                         </main>
                     ) : currentViewState === 'tools' ? (
                         <div className="main-content">
-                            <Tools />
+                            <Suspense fallback={<div className="loading"><div className="spinner"></div><p>Đang tải...</p></div>}>
+                                <Tools />
+                            </Suspense>
                         </div>
                     ) : currentViewState === 'inventory-check' ? (
                         <div className="main-content">
-                            <InventoryCheck />
+                            <Suspense fallback={<div className="loading"><div className="spinner"></div><p>Đang tải...</p></div>}>
+                                <InventoryCheck />
+                            </Suspense>
                         </div>
                     ) : currentViewState === 'warehouse' || currentViewState === 'warehouse-tables' || currentViewState === 'warehouse-flow' ? (
                         <div className="main-content">
-                            <WarehouseLayout activeView={
-                                currentViewState === 'warehouse-tables' ? 'tables' :
-                                    currentViewState === 'warehouse-flow' ? 'flow' : undefined
-                            } />
+                            <Suspense fallback={<div className="loading"><div className="spinner"></div><p>Đang tải...</p></div>}>
+                                <WarehouseLayout activeView={
+                                    currentViewState === 'warehouse-tables' ? 'tables' :
+                                        currentViewState === 'warehouse-flow' ? 'flow' : undefined
+                                } />
+                            </Suspense>
                         </div>
                     ) : (
                         <div className="main-content">
-                            <Management />
+                            <Suspense fallback={<div className="loading"><div className="spinner"></div><p>Đang tải...</p></div>}>
+                                <Management />
+                            </Suspense>
                         </div>
                     )}
                 </div>
@@ -264,6 +280,7 @@ function App() {
                     />
                 )}
             </div>
+            </ErrorBoundary>
         </ThemeProvider>
     );
 }

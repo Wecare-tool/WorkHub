@@ -1,5 +1,5 @@
 import React from 'react';
-import { TeamRegistration, ApprovalStatus } from '../services/dataverseService';
+import { TeamRegistration, ApprovalStatus } from '../services/dataverse';
 
 interface LeaveListProps {
     registrations: TeamRegistration[];

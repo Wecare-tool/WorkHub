@@ -2,6 +2,8 @@ import { AccountInfo, IPublicClientApplication } from "@azure/msal-browser";
 import { dataverseConfig } from "../config/authConfig";
 import { DayRecord } from "../types/types";
 import { getStandardHours, formatDate } from '../utils/workUtils';
+import { cache } from '../utils/cacheUtils';
+import { measureApiCall, createCacheKey } from '../utils/performanceUtils';
 
 // Interface cho data từ Dataverse
 interface DataverseChamCong {
@@ -1245,43 +1247,57 @@ export interface WarehouseLocationOption {
 export async function fetchWarehouseLocationsForFilter(
     accessToken: string
 ): Promise<WarehouseLocationOption[]> {
+    // Check cache first (TTL: 10 minutes for warehouse locations)
+    const cacheKey = 'warehouse_locations';
+    const cached = cache.get<WarehouseLocationOption[]>(cacheKey);
+
+    if (cached) {
+        return cached;
+    }
+
     // Query inventory to find unique warehouse locations
     // We select just the lookup column to minimize data
-    // Increasing top to get good coverage, though this might not get ALL warehouses if some have no stock.
-    const url = `${dataverseConfig.baseUrl}/crdfd_kho_binh_dinhs?$select=_crdfd_vitrikho_value&$top=2000&$filter=statecode eq 0`;
+    // Reduced from 2000 to 1000 for better performance
+    const url = `${dataverseConfig.baseUrl}/crdfd_kho_binh_dinhs?$select=_crdfd_vitrikho_value&$top=1000&$filter=statecode eq 0`;
 
     try {
-        const response = await fetch(url, {
-            headers: {
-                "Authorization": `Bearer ${accessToken}`,
-                "OData-MaxVersion": "4.0",
-                "OData-Version": "4.0",
-                "Accept": "application/json",
-                "Prefer": "odata.include-annotations=\"*\""
-            },
-        });
+        const locations = await measureApiCall('fetchWarehouseLocations', async () => {
+            const response = await fetch(url, {
+                headers: {
+                    "Authorization": `Bearer ${accessToken}`,
+                    "OData-MaxVersion": "4.0",
+                    "OData-Version": "4.0",
+                    "Accept": "application/json",
+                    "Prefer": "odata.include-annotations=\"*\""
+                },
+            });
 
-        if (!response.ok) {
-            console.error("Error fetching warehouse locations from inventory:", await response.text());
-            return [];
-        }
-
-        const data = await response.json();
-        const items = data.value || [];
-
-        // Extract unique locations
-        const locationMap = new Map<string, string>();
-
-        items.forEach((item: any) => {
-            const id = item._crdfd_vitrikho_value;
-            const name = item['_crdfd_vitrikho_value@OData.Community.Display.V1.FormattedValue'];
-
-            if (id && name) {
-                locationMap.set(id, name);
+            if (!response.ok) {
+                console.error("Error fetching warehouse locations from inventory:", await response.text());
+                return [];
             }
+
+            const data = await response.json();
+            const items = data.value || [];
+
+            // Extract unique locations
+            const locationMap = new Map<string, string>();
+
+            items.forEach((item: any) => {
+                const id = item._crdfd_vitrikho_value;
+                const name = item['_crdfd_vitrikho_value@OData.Community.Display.V1.FormattedValue'];
+
+                if (id && name) {
+                    locationMap.set(id, name);
+                }
+            });
+
+            return Array.from(locationMap.entries()).map(([id, name]) => ({ id, name }));
         });
 
-        return Array.from(locationMap.entries()).map(([id, name]) => ({ id, name }));
+        // Cache for 10 minutes
+        cache.set(cacheKey, locations, 10 * 60 * 1000);
+        return locations;
     } catch (e) {
         console.error("Exception fetching warehouse locations:", e);
         return [];
@@ -1347,59 +1363,62 @@ export async function fetchInventoryCheck(
         filter += ` and crdfd_tonkhothucte ne 0`;
     }
 
-    const query = `$filter=${encodeURIComponent(filter)}&$select=${select}&$top=2000&$count=true&$orderby=crdfd_masp asc`;
+    // OPTIMIZED: Reduced from 2000 to 500 for better performance
+    const query = `$filter=${encodeURIComponent(filter)}&$select=${select}&$top=500&$count=true&$orderby=crdfd_masp asc`;
     const url = `${dataverseConfig.baseUrl}/crdfd_kho_binh_dinhs?${query}`;
 
     try {
-        const response = await fetch(url, {
-            headers: {
-                "Authorization": `Bearer ${accessToken}`,
-                "OData-MaxVersion": "4.0",
-                "OData-Version": "4.0",
-                "Accept": "application/json",
-                "Prefer": "odata.include-annotations=\"*\""
-            },
-        });
+        return await measureApiCall('fetchInventoryCheck', async () => {
+            const response = await fetch(url, {
+                headers: {
+                    "Authorization": `Bearer ${accessToken}`,
+                    "OData-MaxVersion": "4.0",
+                    "OData-Version": "4.0",
+                    "Accept": "application/json",
+                    "Prefer": "odata.include-annotations=\"*\""
+                },
+            });
 
-        if (!response.ok) {
-            console.error("Error fetching inventory check:", await response.text());
-            return { data: [], totalCount: 0, hasNextPage: false, hasPreviousPage: false };
-        }
+            if (!response.ok) {
+                console.error("Error fetching inventory check:", await response.text());
+                return { data: [], totalCount: 0, hasNextPage: false, hasPreviousPage: false };
+            }
 
-        const data = await response.json();
-        const items = data.value || [];
-        const totalCount = data['@odata.count'] || items.length;
+            const data = await response.json();
+            const items = data.value || [];
+            const totalCount = data['@odata.count'] || items.length;
 
-        const mappedItems: InventoryCheckItem[] = items.map((item: any) => {
-            const tonKhoThucTe = item.crdfd_tonkhothucte || 0;
-            const hangLoiSauKiem = item.cr1bb_slhangloisaukiem || 0;
+            const mappedItems: InventoryCheckItem[] = items.map((item: any) => {
+                const tonKhoThucTe = item.crdfd_tonkhothucte || 0;
+                const hangLoiSauKiem = item.cr1bb_slhangloisaukiem || 0;
 
-            // Updated name mapping: prioritize lookup formatted value for the cleaner name
-            const productName = item['_crdfd_tensanphamlookup_value@OData.Community.Display.V1.FormattedValue']
-                || item.crdfd_tensptext
-                || item.crdfd_masp
-                || "Unknown";
+                // Updated name mapping: prioritize lookup formatted value for the cleaner name
+                const productName = item['_crdfd_tensanphamlookup_value@OData.Community.Display.V1.FormattedValue']
+                    || item.crdfd_tensptext
+                    || item.crdfd_masp
+                    || "Unknown";
+
+                return {
+                    crdfd_kho_binh_dinhid: item.crdfd_kho_binh_dinhid,
+                    productName: productName,
+                    productCode: item.crdfd_masp || "",
+                    productId: item._crdfd_tensanphamlookup_value || "", // Map Product GUID
+                    warehouseLocation: item['_crdfd_vitrikho_value@OData.Community.Display.V1.FormattedValue'] || "Unknown",
+                    tonKhoThucTe: tonKhoThucTe,
+                    tonKhoLyThuyet: item.crdfd_tonkholythuyet || 0,
+                    tonKhaDung: item.cr1bb_tonkhadung || 0,
+                    hangLoiSauKiem: hangLoiSauKiem,
+                    tongTonKho: tonKhoThucTe + hangLoiSauKiem
+                };
+            });
 
             return {
-                crdfd_kho_binh_dinhid: item.crdfd_kho_binh_dinhid,
-                productName: productName,
-                productCode: item.crdfd_masp || "",
-                productId: item._crdfd_tensanphamlookup_value || "", // Map Product GUID
-                warehouseLocation: item['_crdfd_vitrikho_value@OData.Community.Display.V1.FormattedValue'] || "Unknown",
-                tonKhoThucTe: tonKhoThucTe,
-                tonKhoLyThuyet: item.crdfd_tonkholythuyet || 0,
-                tonKhaDung: item.cr1bb_tonkhadung || 0,
-                hangLoiSauKiem: hangLoiSauKiem,
-                tongTonKho: tonKhoThucTe + hangLoiSauKiem
+                data: mappedItems,
+                totalCount: totalCount,
+                hasNextPage: false, // Since we removed skip, we can't easily valid next page without nextLink
+                hasPreviousPage: false
             };
         });
-
-        return {
-            data: mappedItems,
-            totalCount: totalCount,
-            hasNextPage: false, // Since we removed skip, we can't easily valid next page without nextLink
-            hasPreviousPage: false
-        };
     } catch (e) {
         console.error("Exception fetching inventory check:", e);
         return { data: [], totalCount: 0, hasNextPage: false, hasPreviousPage: false };
@@ -1576,108 +1595,122 @@ export async function fetchInventoryHistory(
     productId: string
 ): Promise<{ records: InventoryHistoryExtendedRecord[], summary: InventoryHistorySummary }> {
 
-    // 1. Fetch all sources in parallel
-    // 1. Fetch all sources in parallel
-    // User requested to NOT load 'crdfd_kiemkhoqrs' (K LOAD BANG NAY)
-    // So we remove checks fetching.
-    const [sales, buys, specialEvents] = await Promise.all([
-        fetchProductSalesTransactions(accessToken, productCode),
-        fetchProductBuyTransactions(accessToken, productCode),
-        fetchProductSpecialEvents(accessToken, productId)
-    ]);
+    // Check cache first (TTL: 5 minutes)
+    const cacheKey = createCacheKey('inventory_history', productCode, productId);
+    const cached = cache.get<{ records: InventoryHistoryExtendedRecord[], summary: InventoryHistorySummary }>(cacheKey);
 
-    // Checks is now empty array
-    const checks: any[] = [];
+    if (cached) {
+        return cached;
+    }
 
-    // 2. Aggregate Summary
-    let totalImport = 0;
-    let totalExport = 0;
-    let totalReturnSale = 0;
-    let totalReturnBuy = 0;
-    let totalBalance = 0;
+    return await measureApiCall(`fetchInventoryHistory:${productCode}`, async () => {
+        // 1. Fetch all sources in parallel
+        // User requested to NOT load 'crdfd_kiemkhoqrs' (K LOAD BANG NAY)
+        // So we remove checks fetching.
+        const [sales, buys, specialEvents] = await Promise.all([
+            fetchProductSalesTransactions(accessToken, productCode),
+            fetchProductBuyTransactions(accessToken, productCode),
+            fetchProductSpecialEvents(accessToken, productId)
+        ]);
 
-    const records: InventoryHistoryExtendedRecord[] = [];
+        // Checks is now empty array
+        const checks: any[] = [];
 
-    // Process Sales
-    sales.forEach(s => {
-        const qtyExport = s.crdfd_soluonggiaotheokho || 0;
-        const qtyReturn = s.crdfd_soluongoitratheokhonew || 0;
+        // 2. Aggregate Summary
+        let totalImport = 0;
+        let totalExport = 0;
+        let totalReturnSale = 0;
+        let totalReturnBuy = 0;
+        let totalBalance = 0;
 
-        totalExport += qtyExport;
-        totalReturnSale += qtyReturn;
+        const records: InventoryHistoryExtendedRecord[] = [];
 
-        records.push({
-            id: s.crdfd_transactionsalesid,
-            type: 'Xuất',
-            date: s.createdon || '',
-            quantity: -qtyExport,
-            quantityReturn: qtyReturn,
-            reference: s.crdfd_maphieuxuat || ''
+        // Process Sales
+        sales.forEach(s => {
+            const qtyExport = s.crdfd_soluonggiaotheokho || 0;
+            const qtyReturn = s.crdfd_soluongoitratheokhonew || 0;
+
+            totalExport += qtyExport;
+            totalReturnSale += qtyReturn;
+
+            records.push({
+                id: s.crdfd_transactionsalesid,
+                type: 'Xuất',
+                date: s.createdon || '',
+                quantity: -qtyExport,
+                quantityReturn: qtyReturn,
+                reference: s.crdfd_maphieuxuat || ''
+            });
         });
-    });
 
-    // Process Buys
-    buys.forEach(b => {
-        const qtyImport = b.crdfd_soluonganhantheokho || 0;
-        const qtyReturn = b.crdfd_soluongoitratheokhonew || 0;
+        // Process Buys
+        buys.forEach(b => {
+            const qtyImport = b.crdfd_soluonganhantheokho || 0;
+            const qtyReturn = b.crdfd_soluongoitratheokhonew || 0;
 
-        totalImport += qtyImport;
-        totalReturnBuy += qtyReturn;
+            totalImport += qtyImport;
+            totalReturnBuy += qtyReturn;
 
-        records.push({
-            id: b.crdfd_transactionbuyid,
-            type: 'Nhập',
-            date: b.createdon || '',
-            quantity: qtyImport,
-            quantityReturn: qtyReturn,
-            reference: b.crdfd_name || '',
+            records.push({
+                id: b.crdfd_transactionbuyid,
+                type: 'Nhập',
+                date: b.createdon || '',
+                quantity: qtyImport,
+                quantityReturn: qtyReturn,
+                reference: b.crdfd_name || '',
+            });
         });
-    });
 
-    // Process Special Events (Cân kho)
-    specialEvents.forEach(e => {
-        const qty = e.quantity || 0; // Assumption
-        totalBalance += qty;
+        // Process Special Events (Cân kho)
+        specialEvents.forEach(e => {
+            const qty = e.quantity || 0; // Assumption
+            totalBalance += qty;
 
-        records.push({
-            id: e.id,
-            type: 'Cân kho',
-            date: e.date || '',
-            quantity: qty,
-            reference: e.reference || '',
-            note: e.note
+            records.push({
+                id: e.id,
+                type: 'Cân kho',
+                date: e.date || '',
+                quantity: qty,
+                reference: e.reference || '',
+                note: e.note
+            });
         });
-    });
 
-    // Process Inventory Checks (Kiểm kho) - Info only
-    checks.forEach(c => {
-        records.push({
-            id: c.crdfd_kiemkhoqrid,
-            type: 'Kiểm kho',
-            date: c.createdon || '',
-            quantity: c.crdfd_soluong || 0, // Assumption
-            reference: c.crdfd_name || '',
+        // Process Inventory Checks (Kiểm kho) - Info only
+        checks.forEach(c => {
+            records.push({
+                id: c.crdfd_kiemkhoqrid,
+                type: 'Kiểm kho',
+                date: c.createdon || '',
+                quantity: c.crdfd_soluong || 0, // Assumption
+                reference: c.crdfd_name || '',
+            });
         });
+
+        // Calculate Current Stock
+        // Formula: (Nhập - Trả Mua) - (Xuất - Trả Bán) + Cân Kho
+        const currentStock = (totalImport - totalReturnBuy) - (totalExport - totalReturnSale) + totalBalance;
+
+        // Sort by date desc
+        records.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+        const result = {
+            records,
+            summary: {
+                totalImport,
+                totalExport,
+                totalReturnSale,
+                totalReturnBuy,
+                totalBalance,
+                currentStock
+            }
+        };
+
+        // Cache for 5 minutes
+        cache.set(cacheKey, result, 5 * 60 * 1000);
+
+        return result;
     });
-
-    // Calculate Current Stock
-    // Formula: (Nhập - Trả Mua) - (Xuất - Trả Bán) + Cân Kho
-    const currentStock = (totalImport - totalReturnBuy) - (totalExport - totalReturnSale) + totalBalance;
-
-    // Sort by date desc
-    records.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-    return {
-        records,
-        summary: {
-            totalImport,
-            totalExport,
-            totalReturnSale,
-            totalReturnBuy,
-            totalBalance,
-            currentStock
-        }
-    };
 }
 
 // --- Helper Fetchers ---

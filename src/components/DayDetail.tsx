@@ -8,7 +8,7 @@ import {
     createPhieuDangKy,
     getAccessToken,
     updateChamCongTime
-} from '../services/dataverseService';
+} from '../services/dataverse';
 import { HINH_THUC_MAP, DEFAULT_HINH_THUC, REGISTRATION_TYPES } from '../constants/registrationConstants';
 
 interface DayDetailProps {

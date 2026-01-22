@@ -1,4 +1,4 @@
-import { RegistrationType, HinhThucRegistration } from '../services/dataverseService';
+import { RegistrationType, HinhThucRegistration } from '../services/dataverse';
 
 export const REGISTRATION_TYPES = [
     { value: RegistrationType.NghiPhep, label: 'Nghỉ phép' },

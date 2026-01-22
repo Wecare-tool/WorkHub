@@ -15,7 +15,7 @@ import {
     InventoryCheckPaginatedResponse,
     WarehouseLocationOption,
     InventoryProduct
-} from '../../services/dataverseService';
+} from '../../services/dataverse';
 import { InventoryHistoryModal } from './InventoryHistoryModal';
 
 const ITEMS_PER_PAGE = 20;

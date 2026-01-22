@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { DayRecord } from '../types/types';
 import {
     getDaysInMonth,
@@ -15,7 +15,7 @@ interface CalendarProps {
     onSelectDate: (date: string) => void;
 }
 
-export const Calendar: React.FC<CalendarProps> = ({
+export const Calendar: React.FC<CalendarProps> = React.memo(({
     year,
     month,
     records,
@@ -24,27 +24,31 @@ export const Calendar: React.FC<CalendarProps> = ({
 }) => {
     const daysInMonth = getDaysInMonth(year, month);
     const firstDayOfWeek = getDayOfWeek(year, month, 1);
-    const today = new Date();
-    const todayStr = formatDate(today.getFullYear(), today.getMonth(), today.getDate());
+    const today = useMemo(() => new Date(), []);
+    const todayStr = useMemo(() => formatDate(today.getFullYear(), today.getMonth(), today.getDate()), [today]);
 
-    // Tạo map từ date -> record
-    const recordMap = new Map<string, DayRecord>();
-    records.forEach(r => recordMap.set(r.date, r));
+    // Tạo map từ date -> record (memoized)
+    const recordMap = useMemo(() => {
+        const map = new Map<string, DayRecord>();
+        records.forEach(r => map.set(r.date, r));
+        return map;
+    }, [records]);
 
-    // Tạo mảng các ngày hiển thị
-    const calendarDays: (number | null)[] = [];
+    // Tạo mảng các ngày hiển thị (memoized)
+    const calendarDays = useMemo<(number | null)[]>(() => {
+        const days: (number | null)[] = [];
+        // Thêm các ô trống cho đầu tháng
+        for (let i = 0; i < firstDayOfWeek; i++) {
+            days.push(null);
+        }
+        // Thêm các ngày trong tháng
+        for (let day = 1; day <= daysInMonth; day++) {
+            days.push(day);
+        }
+        return days;
+    }, [firstDayOfWeek, daysInMonth]);
 
-    // Thêm các ô trống cho đầu tháng
-    for (let i = 0; i < firstDayOfWeek; i++) {
-        calendarDays.push(null);
-    }
-
-    // Thêm các ngày trong tháng
-    for (let day = 1; day <= daysInMonth; day++) {
-        calendarDays.push(day);
-    }
-
-    const getDayClass = (day: number | null): string => {
+    const getDayClass = useCallback((day: number | null): string => {
         if (day === null) return 'calendar-day empty';
 
         const dateStr = formatDate(year, month, day);
@@ -80,9 +84,9 @@ export const Calendar: React.FC<CalendarProps> = ({
         }
 
         return classes.join(' ');
-    };
+    }, [year, month, selectedDate, todayStr, recordMap]);
 
-    const formatTime = (timeStr?: string) => {
+    const formatTime = useCallback((timeStr?: string) => {
         if (!timeStr) return '--:--';
         // Check if ISO string or Date string
         if (timeStr.includes('T') || timeStr.includes('-')) {
@@ -95,7 +99,7 @@ export const Calendar: React.FC<CalendarProps> = ({
         }
         // Assume simple time string like "08:00:00"
         return timeStr.substring(0, 5);
-    };
+    }, []);
 
     return (
         <div className="calendar">
@@ -195,4 +199,4 @@ export const Calendar: React.FC<CalendarProps> = ({
             </div>
         </div>
     );
-};
+});

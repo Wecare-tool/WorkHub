@@ -7,7 +7,7 @@ import {
     getAccessToken,
     InventoryProduct,
     InventoryProductsPaginatedResponse
-} from '../../services/dataverseService';
+} from '../../services/dataverse';
 import { InventoryHistoryModal } from './InventoryHistoryModal';
 
 interface LocationOption {
